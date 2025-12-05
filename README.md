@@ -1,4 +1,7 @@
-# Graph partitioning algorithm for minizing cut-rank by matrix investigations
+# min-cutrank 
+This repo contains a scalable and efficient metaheuristic algorithm for finding a bipartition of a graph with minimal cut ran. For more details, see the [paper](./Effective%20Partitioning%20for%20Distributed%20Measurement-Based%20Quantum%20Computing.pdf).
+
+## Graph partitioning algorithm for minizing cut-rank by matrix investigations
 
 - The core object for calculating cut-ranks is GraphPartition from graph_partition.py. The constructor takes two arguments:
   - The adjacency matrix, as a list of lists of int, like [[0, 1, 0, 0], [1, 0, 1, 0], [0, 1, 0, 1], [0, 0, 1, 0]]
@@ -8,23 +11,23 @@
 - Use 'all_swap_cut_rank' from swap_rank_calculator.py to find the cut_ranks for all swapping combinations of any row and any column. It has time complexity O(n^2).
 - Use the 'apply_swap' method on a GraphPartition object to apply a swap and update all necessary matrices for further swap cut-rank calculations. It should have time complexity O(n^2).
 
-# Annealing algorithm
+## Annealing algorithm
 
 - Use the method 'cut_rank_annealing_row_formula' from cut_rank_annealing.py to run the annealing algorithm using matrix investigations for the cut-ranks.
 
-# Programs related to cut-rank calculations (see each file for more information)
+## Programs related to cut-rank calculations (see each file for more information)
 
-## Testing
+### Testing
 
 - test_cut_rank.py: Test program for verifying the swap cut-rank formulas and for validating the variables in the GraphPartition object.
 - test_annealing.py: Test program for the annealing algorithm.
 
-## Collecting computational results
+### Collecting computational results
 
 - compare_grid_annealing.py: Program collecting time measures on the two grid annealing algorithms on NxN grids for a range of N.
 - grid_annealing_success.py: Program testing how successful the annealing algorithgm is on NxN grids for a range of N.
 - sparse_annealing.py:  Program testing the annealing algorithgm on random sparse graphs of N nodes and c/N probability for each edge for given input constant c
 
-# Results
+## Results
 
 See results\overview.txt for details

@@ -1,5 +1,5 @@
 # min-cutrank 
-This repo contains a scalable and efficient metaheuristic algorithm for finding a bipartition of a graph with minimal cut ran. For more details, see the [paper](./Effective%20Partitioning%20for%20Distributed%20Measurement-Based%20Quantum%20Computing.pdf).
+This repo contains a scalable metaheuristic for finding graph bipartitions with minimal cut rank, a key metric for distributed measurement-based quantum computing. The implementation combines matrix-based cut-rank evaluations with swap heuristics and simulated annealing to balance optimality and runtime on both grid and sparse topologies. Benchmarks and testing utilities demonstrate how the approach scales across graph families and highlight practical trade-offs when tuning annealing schedules. For more details, see the [paper](./Effective%20Partitioning%20for%20Distributed%20Measurement-Based%20Quantum%20Computing.pdf).
 
 ## Graph partitioning algorithm for minizing cut-rank by matrix investigations
 

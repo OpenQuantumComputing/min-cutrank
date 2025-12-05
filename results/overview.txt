@@ -1,0 +1,17 @@
+Test files on this folder:
+
+Testing annealing algorithm success
+* python.exe grid_annealing_success.py -s 12345 -r 3-20 -n 100 -o results\grid_annealing_success_r3-20_n100_temps10.txt
+
+Comparing the execution time of the annealing algorithm by using matrix investigation vs directly on the adjacency graph with Gauss-Jordan elimination
+* python.exe compare_grid_annealing.py -s 12345 -r 3-20 -o results\compare_grid_annealing_r3-20_temps10.txt
+
+Execution time and average final cut-rank by annealing algorithm run on sparse graphs of size 2-100, with edge probability p = c/N:
+For c = 1, partition sizes (N/2, N/2):
+* python.exe sparse_annealing.py -s 12345 -r 2-100 -c 1.0 -n 100 -o .\results\sparse_annealing_r2-100_c1_temps10.txt
+For c = 2, partition sizes (N/2, N/2):
+* python.exe sparse_annealing.py -s 12345 -r 2-100 -c 2.0 -n 100 -o .\results\sparse_annealing_r2-100_c2_temps10.txt
+For c = 1, partition sizes (N/3, 2N/3):
+* python.exe sparse_annealing.py -s 12345 -r 2-100 -c 1.0 -p 0.33333333 -n 100 -o .\results\sparse_annealing_r2-100_c1_p1div3_temps10.txt
+For c = 2, partition sizes (N/3, 2N/3):
+* python.exe sparse_annealing.py -s 12345 -r 2-100 -c 2.0 -p 0.33333333 -n 100 -o .\results\sparse_annealing_r2-100_c2_p1div3_temps10.txt

@@ -69,7 +69,7 @@ if __name__=="__main__":
                 log = parse_bool(value, False)
 
         if graph_setup == None:
-            print("Graph setup missing")
+            print("Graph setup missing, see documentation.")
 
         else:
             if seed != None:
@@ -78,17 +78,20 @@ if __name__=="__main__":
             graph_partition = random_partition(graph_adj_matrix, set_portion)
 
             seed_algo = random.randint(0, 65535)
-            for cut_rank_m in cut_rank_methods:
-                random.seed(seed_algo)
+            if cut_rank_methods == []:
+                print("No cut-rank annealing methods specified, see documentation.")
+            else:
+                for cut_rank_m in cut_rank_methods:
+                    random.seed(seed_algo)
+                    
+                    if cut_rank_m == "gauss":
+                        test_annealing_method(cut_rank_annealing_direct, "Gauss-Jordan elimination cut-rank calculation", graph_partition, temperatures, log)
 
-                if cut_rank_m == "gauss":
-                    test_annealing_method(cut_rank_annealing_direct, "Gauss-Jordan elimination cut-rank calculation", graph_partition, temperatures, log)
+                    elif cut_rank_m == "formula":
+                        test_annealing_method(cut_rank_annealing_row_formula, "Formula for all cut-ranks on row", graph_partition, temperatures, log)
 
-                elif cut_rank_m == "formula":
-                    test_annealing_method(cut_rank_annealing_row_formula, "Formula for all cut-ranks on row", graph_partition, temperatures, log)
-
-                else:
-                    print(f"Unknown cut-rank annealing method: '{cut_rank_m}'")
+                    else:
+                        print(f"Unknown cut-rank annealing method: '{cut_rank_m}'")
 
     except getopt.error as err:
         print(str(err))

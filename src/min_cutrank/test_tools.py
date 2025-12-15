@@ -164,58 +164,28 @@ class ApplySwapRankCollector(RankCollector):
 
     partition : GraphPartition
 
+    backup : GraphPartition
+
     validate : bool
-
-    row_flag : list[bool]
-
-    rows : list[int]
-
-    columns : list[int]
-
-    base_flag : list[bool]
-
-    cut_rank : int
-
-    base_rows : list[int]
-
-    base_columns : list[int]
-
-    free_rows : list[int]
-
-    free_columns : list[int]
-
-    base_inverse : list[list[int]]
-
-    adj_b_inverse: list[list[int]]
-
-    b_inverse_adj: list[list[int]]
-
-    adj_b_inv_adj: list[list[int]]
 
     buffer_flag : list[bool]
 
     def __init__(self, partition : GraphPartition, validate : bool):
         self.partition = partition
+        self.backup = clone_partition(partition)
+
         self.validate = validate
-        self.base_inverse = create_zero_matrix(partition.nmb_nodes, partition.nmb_nodes)
-        self.adj_b_inverse = create_zero_matrix(partition.nmb_nodes, partition.nmb_nodes)
-        self.b_inverse_adj = create_zero_matrix(partition.nmb_nodes, partition.nmb_nodes)
-        self.adj_b_inv_adj = create_zero_matrix(partition.nmb_nodes, partition.nmb_nodes)
-        self.row_flag = [False] * partition.nmb_nodes
-        self.base_flag = [False] * partition.nmb_nodes
-        self.rows = [0] * len(partition.rows)
-        self.columns = [0] * len(partition.columns)
         self.buffer_flag = [False] * partition.nmb_nodes
 
     def collect_ranks(self, cut_ranks : list[list[int]]) -> None:
-        self._backup()
-        for row in self.rows:
-            for col in self.columns:
+        self.backup.copy(self.partition)
+        for row in self.backup.rows:
+            for col in self.backup.columns:
                 self.partition.apply_swap(row, col)
                 cut_ranks[row][col] = self.partition.cut_rank
                 if self.validate:
                     self._validate_partition()
-                self._restore()
+                self.partition.copy(self.backup)
 
     def name(self) -> str:
         return "Apply swap with validation" if self.validate else "Apply swap without validation"
@@ -304,36 +274,6 @@ class ApplySwapRankCollector(RankCollector):
     def _copy_list(self, from_l : list, to_l : list) -> None:
         for i in range(len(from_l)):
             to_l[i] = from_l[i]
-
-    def _backup(self) -> None:
-        copy_matrix(self.partition.base_inverse, self.base_inverse, self.partition.nodes, self.partition.nodes)
-        copy_matrix(self.partition.adj_b_inverse, self.adj_b_inverse, self.partition.nodes, self.partition.nodes)
-        copy_matrix(self.partition.b_inverse_adj, self.b_inverse_adj, self.partition.nodes, self.partition.nodes)
-        copy_matrix(self.partition.adj_b_inv_adj, self.adj_b_inv_adj, self.partition.nodes, self.partition.nodes)
-        self._copy_list(self.partition.row_flag, self.row_flag)
-        self._copy_list(self.partition.base_flag, self.base_flag)
-        self._copy_list(self.partition.rows, self.rows)
-        self._copy_list(self.partition.columns, self.columns)
-        self.cut_rank = self.partition.cut_rank
-        self.base_rows = self.partition.base_rows
-        self.base_columns = self.partition.base_columns
-        self.free_rows = self.partition.free_rows
-        self.free_columns = self.partition.free_columns
-
-    def _restore(self) -> None:
-        copy_matrix(self.base_inverse, self.partition.base_inverse, self.partition.nodes, self.partition.nodes)
-        copy_matrix(self.adj_b_inverse, self.partition.adj_b_inverse, self.partition.nodes, self.partition.nodes)
-        copy_matrix(self.b_inverse_adj, self.partition.b_inverse_adj, self.partition.nodes, self.partition.nodes)
-        copy_matrix(self.adj_b_inv_adj, self.partition.adj_b_inv_adj, self.partition.nodes, self.partition.nodes)
-        self._copy_list(self.row_flag, self.partition.row_flag)
-        self._copy_list(self.base_flag, self.partition.base_flag)
-        self._copy_list(self.rows, self.partition.rows)
-        self._copy_list(self.columns, self.partition.columns)
-        self.partition.cut_rank = self.cut_rank
-        self.partition.base_rows = self.base_rows
-        self.partition.base_columns = self.base_columns
-        self.partition.free_rows = self.free_rows
-        self.partition.free_columns = self.free_columns
 
 class CutRankCalculatorComparer:
 

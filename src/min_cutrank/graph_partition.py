@@ -190,6 +190,23 @@ class GraphPartition:
             self.cut_rank = len(self.base_rows)
 
 
+    def copy(self, other: 'GraphPartition') -> None:
+        """Copy all partition state from other into self."""
+        copy_matrix(other.base_inverse, self.base_inverse, other.nodes, other.nodes)
+        copy_matrix(other.adj_b_inverse, self.adj_b_inverse, other.nodes, other.nodes)
+        copy_matrix(other.b_inverse_adj, self.b_inverse_adj, other.nodes, other.nodes)
+        copy_matrix(other.adj_b_inv_adj, self.adj_b_inv_adj, other.nodes, other.nodes)
+        self.row_flag[:] = other.row_flag[:]
+        self.base_flag[:] = other.base_flag[:]
+        self.rows[:] = other.rows[:]
+        self.columns[:] = other.columns[:]
+        self.cut_rank = other.cut_rank
+        self.base_rows[:] = other.base_rows[:]
+        self.base_columns[:] = other.base_columns[:]
+        self.free_rows[:] = other.free_rows[:]
+        self.free_columns[:] = other.free_columns[:]
+
+
     def apply_swap(self, row : int, column : int) -> None:
 
         remove_rows : list[int]

@@ -1,6 +1,6 @@
 import random
-from matrix_tools import create_zero_matrix
-from graph_partition import GraphPartition
+from min_cutrank.matrix_tools import create_zero_matrix
+from min_cutrank.graph_partition import GraphPartition
 
 
 def set_edge(adjacency_matrix : list[list[int]], n_from : int, n_to : int) -> None:

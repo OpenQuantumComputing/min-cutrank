@@ -1,4 +1,4 @@
-from graph_partition import GraphPartition
+from min_cutrank.graph_partition import GraphPartition
 
 
 def all_swap_cut_ranks(partition : GraphPartition, ranks : list[list[int]]) -> None:

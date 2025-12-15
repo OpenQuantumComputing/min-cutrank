@@ -1,8 +1,8 @@
 import sys
 import getopt
 import random
-from test_tools import parse_int, parse_float, graph_from_description, run_greedy_min_rank
-from partition_builder import random_partition
+from min_cutrank.test_tools import parse_int, parse_float, graph_from_description, run_greedy_min_rank
+from min_cutrank.partition_builder import random_partition
 
 
 if __name__=="__main__":

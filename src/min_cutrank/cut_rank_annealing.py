@@ -1,9 +1,9 @@
 import numpy as np
 import random
-from matrix_tools import copy_matrix, rank_matrix_positions
-from swap_rank_calculator import row_swap_cut_ranks
+from min_cutrank.matrix_tools import copy_matrix, rank_matrix_positions
+from min_cutrank.swap_rank_calculator import row_swap_cut_ranks
 
-from graph_partition import GraphPartition
+from min_cutrank.graph_partition import GraphPartition
 
 
 def cut_rank_annealing_direct(partition : GraphPartition, temperatures, log: bool) -> None:

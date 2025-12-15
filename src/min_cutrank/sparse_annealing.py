@@ -3,9 +3,9 @@ import sys
 import getopt
 import random
 import time
-from test_tools import parse_int, parse_float, temperatures_from_description
-from partition_builder import random_partition, random_graph
-from cut_rank_annealing import cut_rank_annealing_row_formula
+from min_cutrank.test_tools import parse_int, parse_float, temperatures_from_description
+from min_cutrank.partition_builder import random_partition, random_graph
+from min_cutrank.cut_rank_annealing import cut_rank_annealing_row_formula
 
 
 if __name__=="__main__":

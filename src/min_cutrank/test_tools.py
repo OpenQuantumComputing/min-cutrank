@@ -1,10 +1,10 @@
 import numpy as np
 import time
 import random
-from graph_partition import GraphPartition
-from partition_builder import set_edge, grid_graph, random_graph
-from matrix_tools import create_zero_matrix, copy_matrix, rank_matrix_positions, set_common_matrix_value, insert_zero_matrix, add_matrix, add_product_matrix, is_zero_matrix, is_identity_matrix
-from swap_rank_calculator import all_swap_cut_ranks, row_swap_cut_ranks, single_swap_cut_rank
+from min_cutrank.graph_partition import GraphPartition
+from min_cutrank.partition_builder import set_edge, grid_graph, random_graph
+from min_cutrank.matrix_tools import create_zero_matrix, copy_matrix, rank_matrix_positions, set_common_matrix_value, insert_zero_matrix, add_matrix, add_product_matrix, is_zero_matrix, is_identity_matrix
+from min_cutrank.swap_rank_calculator import all_swap_cut_ranks, row_swap_cut_ranks, single_swap_cut_rank
 
 
 def parse_int(value: str, default: int) -> int:

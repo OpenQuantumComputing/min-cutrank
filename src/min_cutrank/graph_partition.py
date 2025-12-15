@@ -1,4 +1,4 @@
-from matrix_tools import create_zero_matrix, insert_zero_matrix, copy_matrix, rank_matrix_positions, matrix_inverse, add_product_matrix
+from min_cutrank.matrix_tools import create_zero_matrix, insert_zero_matrix, copy_matrix, rank_matrix_positions, matrix_inverse, add_product_matrix
 
 class GraphPartition:
 

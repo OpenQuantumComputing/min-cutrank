@@ -17,8 +17,7 @@ def run_annealing_method(annealing_method, partition, temperatures) -> None:
     return time_total
 
 
-if __name__=="__main__":
-
+def compare_grid_annealing(opt_arguments: list[str]) -> None:
     """
     Program collecting time measures on the two grid annealing algorithms on NxN grids for a range of N.
 
@@ -34,8 +33,6 @@ if __name__=="__main__":
     -t Temp     The temperature setup. See 'temperatures_from_description'. Default is '1e0.1s10', i.e. 10 temperatures on a linear range from 1.0 to 0.1
     -o Outfile  The path to the output file. If absent, not output is written to file.
     """
-
-    opt_arguments = sys.argv[1:]
 
     seed = None
 
@@ -112,3 +109,6 @@ if __name__=="__main__":
 
     except getopt.error as err:
         print(str(err))
+
+if __name__=="__main__":
+    compare_grid_annealing(sys.argv[1:])

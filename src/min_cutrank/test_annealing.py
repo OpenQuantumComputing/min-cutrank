@@ -17,8 +17,7 @@ def test_annealing_method(annealing_method, name : str, partition, temperatures,
     print(f"Annealing method '{name}' completed at cut-rank {partition_copy.cut_rank} in {end - start} sec")
 
 
-if __name__=="__main__":
-
+def run_annealing(opt_arguments: list[str]) -> None:
     """
     Test program for the annealing algorithm.
 
@@ -36,8 +35,6 @@ if __name__=="__main__":
                 'formula' calculates the swap cut-ranks for each selected element in the first partition set by one single call to 'row_swap_cut_ranks'
     -l Bool     Whether the rank at the beginning and after each temperature sweep should be logged to the console.
     """
-
-    opt_arguments = sys.argv[1:]
 
     seed = None
     graph_setup = None
@@ -95,3 +92,6 @@ if __name__=="__main__":
 
     except getopt.error as err:
         print(str(err))
+
+if __name__=="__main__":
+    run_annealing(sys.argv[1:])

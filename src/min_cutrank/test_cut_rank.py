@@ -4,9 +4,7 @@ import random
 from min_cutrank.test_tools import parse_int, parse_float, graph_from_description, run_greedy_min_rank
 from min_cutrank.partition_builder import random_partition
 
-
-if __name__=="__main__":
-
+def run_greedy(opt_arguments: list[str]) -> None:
     """
     Test program for verifying the swap cut-rank formulas and for validating the variables in the GraphPartition object.
 
@@ -27,8 +25,6 @@ if __name__=="__main__":
                 'apply' calculates the swap cut-ranks by actually applying the swaps to the GraphPartition object
                 'validate' does the same as 'apply', but also validates all the variables of the GraphPartition object after the swap has been applied
     """
-
-    opt_arguments = sys.argv[1:]
 
     seed = None
     graph_setup = None
@@ -51,11 +47,6 @@ if __name__=="__main__":
                 set_portion = parse_float(value, 0.5)
             elif argument in ("-m", "--methods"):
                 rank_calculation_methods = value.split(",")
-            elif argument in ("-d", "--directly"):
-                ranks_directly = True
-            elif argument in ("-a", "--apply"):
-                ranks_by_apply = True
-                validate = value == "validate"
 
         if graph_setup == None:
             print("Graph setup missing")
@@ -70,3 +61,6 @@ if __name__=="__main__":
 
     except getopt.error as err:
         print(str(err))
+
+if __name__=="__main__":
+    run_greedy(sys.argv[1:])

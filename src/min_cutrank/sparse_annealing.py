@@ -8,8 +8,7 @@ from min_cutrank.partition_builder import random_partition, random_graph
 from min_cutrank.cut_rank_annealing import cut_rank_annealing_row_formula
 
 
-if __name__=="__main__":
-
+def run_sparse_annealing(opt_arguments: list[str]) -> None:
     """
     Program testing the annealing algorithgm on random sparse graphs of N nodes and c/N probability for each edge for given input constant c
 
@@ -29,8 +28,6 @@ if __name__=="__main__":
     -t Temp     The temperature setup. See 'temperatures_from_description'. Default is '1e0.1s10', i.e. 10 temperatures on a linear range from 1.0 to 0.1
     -o Outfile  The path to the output file. If absent, not output is written to file.
     """
-
-    opt_arguments = sys.argv[1:]
 
     seed = None
 
@@ -125,3 +122,6 @@ if __name__=="__main__":
 
     except getopt.error as err:
         print(str(err))
+
+if __name__=="__main__":
+    run_sparse_annealing(sys.argv[1:])

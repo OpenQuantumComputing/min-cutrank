@@ -6,6 +6,7 @@ from min_cutrank.graph_partition import GraphPartition
 from min_cutrank.test_tools import CutRankCalculatorComparer, graph_from_description, rank_collector_from_name
 
 class TestCutRankCalculation(unittest.TestCase):
+    """Tests for verifying that different cut-rank calculation methods give the same results."""
 
     def test_single_rank_calculation_matches_gauss(self):
         graph_setup = "r20"

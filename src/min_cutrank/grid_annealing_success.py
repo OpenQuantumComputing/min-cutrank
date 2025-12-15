@@ -8,8 +8,7 @@ from min_cutrank.partition_builder import random_partition, grid_graph
 from min_cutrank.cut_rank_annealing import cut_rank_annealing_row_formula
 
 
-if __name__=="__main__":
-
+def grid_annealing_success(opt_arguments: list[str]) -> None:
     """
     Program testing how successful the annealing algorithgm is on NxN grids for a range of N.
 
@@ -25,8 +24,6 @@ if __name__=="__main__":
     -t Temp     The temperature setup. See 'temperatures_from_description'. Default is '1e0.1s10', i.e. 10 temperatures on a linear range from 1.0 to 0.1
     -o Outfile  The path to the output file. If absent, not output is written to file.
     """
-
-    opt_arguments = sys.argv[1:]
 
     seed = None
 
@@ -120,3 +117,6 @@ if __name__=="__main__":
 
     except getopt.error as err:
         print(str(err))
+
+if __name__=="__main__":
+    grid_annealing_success(sys.argv[1:])

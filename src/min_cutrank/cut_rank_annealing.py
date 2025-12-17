@@ -24,7 +24,7 @@ def cut_rank_annealing_direct(partition : GraphPartition, temperatures, log: boo
 
                 rows[i], cols[j] = cols[j], rows[i]
 
-                copy_matrix(partition.adjacencies, partition.buffer, rows, cols)
+                copy_matrix(partition.graph.adjacencies, partition.buffer, rows, cols)
                 base_rows, _ = rank_matrix_positions(partition.buffer, rows, cols)
                 new_cut_rank = len(base_rows)
                 delta_rank = new_cut_rank - cut_rank
@@ -42,7 +42,7 @@ def cut_rank_annealing_row_formula(partition : GraphPartition, temperatures, log
 
     rows = partition.rows[:]
     cols = partition.columns[:]
-    row_ranks = [-1] * partition.nmb_nodes
+    row_ranks = [-1] * partition.graph.nmb_nodes
     cut_rank = partition.cut_rank
     nmb_rows = len(rows)
     nmb_cols = len(cols)
@@ -54,7 +54,7 @@ def cut_rank_annealing_row_formula(partition : GraphPartition, temperatures, log
 
         for i in range(nmb_rows):
             row = rows[i]
-            for n in partition.nodes:
+            for n in partition.graph.nodes:
                 row_ranks[n] = -1
             row_swap_cut_ranks(partition, row, row_ranks)
             swap_col = -1

@@ -3,8 +3,9 @@ import sys
 import getopt
 import random
 import time
+from min_cutrank.graph import Graph
 from min_cutrank.test_tools import parse_int, parse_float, temperatures_from_description
-from min_cutrank.partition_builder import random_partition, grid_graph
+from min_cutrank.partition_builder import random_partition
 from min_cutrank.cut_rank_annealing import cut_rank_annealing_row_formula
 
 
@@ -83,7 +84,7 @@ def grid_annealing_success(opt_arguments: list[str]) -> None:
                     random.seed(seed)
                 results = {}
                 for size in range(min_size, above_max_size):
-                    adj_mat = grid_graph(size, size)
+                    adj_mat = Graph.grid_graph(size, size)
                     nmb_exp_rank = 0
                     sum_rank = 0
                     print(f"Starting running {samples} of grid size {size}x{size}")

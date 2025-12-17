@@ -3,8 +3,9 @@ import sys
 import getopt
 import random
 import time
+from min_cutrank.graph import Graph
 from min_cutrank.test_tools import parse_int, parse_float, temperatures_from_description, clone_partition
-from min_cutrank.partition_builder import random_partition, grid_graph
+from min_cutrank.partition_builder import random_partition
 from min_cutrank.cut_rank_annealing import cut_rank_annealing_direct, cut_rank_annealing_row_formula
 
 
@@ -87,7 +88,7 @@ def compare_grid_annealing(opt_arguments: list[str]) -> None:
                 results = {}
                 for size in range(min_size, above_max_size):
                     seed_algo = random.randint(0, 65535)
-                    adj_mat = grid_graph(size, size)
+                    adj_mat = Graph.grid_graph(size, size)
                     partition = random_partition(adj_mat, set_portion)
 
                     random.seed(seed_algo)

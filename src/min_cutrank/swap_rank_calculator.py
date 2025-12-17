@@ -10,12 +10,13 @@ def all_swap_cut_ranks(partition : GraphPartition, ranks : list[list[int]]) -> N
     """
 
     old_rank = partition.cut_rank
-
+    nmb_nodes = partition.graph.nmb_nodes
+    
     # Preprocessing on rows
-    s1_k1 = [-1] * partition.nmb_nodes
-    s2 = [False] * partition.nmb_nodes
-    q4_952_0 = [False] * partition.nmb_nodes
-    q4_952_1 = [False] * partition.nmb_nodes
+    s1_k1 = [-1] * nmb_nodes
+    s2 = [False] * nmb_nodes
+    q4_952_0 = [False] * nmb_nodes
+    q4_952_1 = [False] * nmb_nodes
     for i in partition.base_rows:
         k1 = next((k1 for k1 in partition.free_rows if partition.adj_b_inverse[k1][i] == 1), -1)
         s1_k1[i] = k1
@@ -29,10 +30,10 @@ def all_swap_cut_ranks(partition : GraphPartition, ranks : list[list[int]]) -> N
         s2[i] = any(k2 != i and partition.adj_b_inv_adj[k2][i] == 1 for k2 in partition.free_rows)
 
     # Preprocessing on columns
-    t1_l1 = [-1] * partition.nmb_nodes
-    t2 = [False] * partition.nmb_nodes
-    q5_952_0 = [False] * partition.nmb_nodes
-    q5_952_1 = [False] * partition.nmb_nodes
+    t1_l1 = [-1] * nmb_nodes
+    t2 = [False] * nmb_nodes
+    q5_952_0 = [False] * nmb_nodes
+    q5_952_1 = [False] * nmb_nodes
     for j in partition.base_columns:
         l1 = next((l1 for l1 in partition.free_columns if partition.b_inverse_adj[j][l1] == 1), -1)
         t1_l1[j] = l1

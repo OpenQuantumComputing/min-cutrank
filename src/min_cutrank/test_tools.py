@@ -1,8 +1,8 @@
 import numpy as np
 import time
 import random
+from min_cutrank.graph import Graph, set_edge
 from min_cutrank.graph_partition import GraphPartition
-from min_cutrank.partition_builder import set_edge, grid_graph, random_graph
 from min_cutrank.matrix_tools import create_zero_matrix, copy_matrix, rank_matrix_positions, set_common_matrix_value, insert_zero_matrix, add_matrix, add_product_matrix, is_zero_matrix, is_identity_matrix
 from min_cutrank.swap_rank_calculator import all_swap_cut_ranks, row_swap_cut_ranks, single_swap_cut_rank
 
@@ -49,7 +49,7 @@ def graph_from_description(description : str) -> list[list[int]]:
         idx_x = description.index("x")
         rows = int(description[1 : idx_x])
         cols = int(description[(idx_x + 1) :])
-        return grid_graph(rows, cols)
+        return Graph.grid_graph(rows, cols)
 
     elif gr_type == "r":
         idx_e = description.find("e")
@@ -59,7 +59,7 @@ def graph_from_description(description : str) -> list[list[int]]:
         else:
             nodes = int(description[1 :])
             edge_prob = 0.5
-        return random_graph(nodes, edge_prob)
+        return Graph.random_graph(nodes, edge_prob)
 
     else:
         raise Exception(f"Unknown graph type : {gr_type}")
@@ -77,7 +77,7 @@ def temperatures_from_description(description : str) -> np.ndarray[float]:
 
 
 def clone_partition(partition : GraphPartition) -> GraphPartition:
-    return GraphPartition(partition.adjacencies, partition.rows, partition.columns)
+    return GraphPartition(partition.graph, partition.rows, partition.columns)
 
 
 class RankCollector:
@@ -96,7 +96,7 @@ class DirectSwapRankCollector(RankCollector):
 
     def __init__(self, partition : GraphPartition):
         self.partition = partition
-        self.buffer = create_zero_matrix(partition.nmb_nodes, partition.nmb_nodes)
+        self.buffer = create_zero_matrix(partition.graph.nmb_nodes, partition.graph.nmb_nodes)
 
     def collect_ranks(self, cut_ranks : list[list[int]]) -> None:
         rows_copy = self.partition.rows[:]
@@ -106,7 +106,7 @@ class DirectSwapRankCollector(RankCollector):
             for j in range(len(self.partition.columns)):
                 col = self.partition.columns[j]
                 rows_copy[i], cols_copy[j] = col, row
-                copy_matrix(self.partition.adjacencies, self.buffer, rows_copy, cols_copy)
+                copy_matrix(self.partition.graph.adjacencies, self.buffer, rows_copy, cols_copy)
                 base_rows, _ = rank_matrix_positions(self.buffer, rows_copy, cols_copy)
                 cut_ranks[row][col] = len(base_rows)
                 rows_copy[i], cols_copy[j] = row, col
@@ -127,7 +127,7 @@ class FormulaRankCollector(RankCollector):
         self.partition = partition
         self.single_ranks = single_ranks
         self.row_ranks = row_ranks and not single_ranks
-        row_ranks = [0] * self.partition.nmb_nodes
+        row_ranks = [0] * self.partition.graph.nmb_nodes
 
     def collect_ranks(self, cut_ranks : list[list[int]]) -> None:
         if self.single_ranks:
@@ -175,7 +175,7 @@ class ApplySwapRankCollector(RankCollector):
         self.backup = clone_partition(partition)
 
         self.validate = validate
-        self.buffer_flag = [False] * partition.nmb_nodes
+        self.buffer_flag = [False] * partition.graph.nmb_nodes
 
     def collect_ranks(self, cut_ranks : list[list[int]]) -> None:
         self.backup.copy(self.partition)
@@ -197,6 +197,7 @@ class ApplySwapRankCollector(RankCollector):
         # Equally many base rows and base columns
         p = self.partition
         buffer = p.buffer
+        nodes = p.graph.nodes
 
         row_flag = self.buffer_flag
         for n in p.rows:
@@ -235,47 +236,49 @@ class ApplySwapRankCollector(RankCollector):
             raise Exception("Number of base rows differs from cut-rank")
         if p.cut_rank != len(p.base_columns):
             raise Exception("Number of base columns differs from cut-rank")
-        for n in p.nodes:
+        for n in nodes:
             self.buffer_flag[n] = False
+
+        adjacencies = p.graph.adjacencies
 
         # Test C * C^(-1) = Id
         insert_zero_matrix(buffer, p.base_rows, p.base_rows)
-        add_product_matrix(p.adjacencies, p.base_inverse, buffer, p.base_rows, p.base_columns, p.base_rows)
+        add_product_matrix(adjacencies, p.base_inverse, buffer, p.base_rows, p.base_columns, p.base_rows)
         if not is_identity_matrix(buffer, p.base_rows):
             raise Exception("Wrong inverse of rank matrix")
 
         # Test D-matrix in base set
-        copy_matrix(p.adj_b_inverse, buffer, p.nodes, p.base_rows)
-        add_product_matrix(p.adjacencies, p.base_inverse, buffer, p.nodes, p.base_columns, p.base_rows)
-        if not is_zero_matrix(buffer, p.nodes, p.base_rows):
+        copy_matrix(p.adj_b_inverse, buffer, nodes, p.base_rows)
+        add_product_matrix(adjacencies, p.base_inverse, buffer, nodes, p.base_columns, p.base_rows)
+        if not is_zero_matrix(buffer, nodes, p.base_rows):
             raise Exception("Wrong value of A^(YB) * C^(-1)")
         if not is_identity_matrix(p.adj_b_inverse, p.base_rows):
             raise Exception("XB x XB submatrix of A^(YB) * C^(-1) is not identity")
 
         # Test E-matrix in base set
-        copy_matrix(p.b_inverse_adj, buffer, p.base_columns, p.nodes)
-        add_product_matrix(p.base_inverse, p.adjacencies, buffer, p.base_columns, p.base_rows, p.nodes)
-        if not is_zero_matrix(buffer, p.nodes, p.base_rows):
+        copy_matrix(p.b_inverse_adj, buffer, p.base_columns, nodes)
+        add_product_matrix(p.base_inverse, adjacencies, buffer, p.base_columns, p.base_rows, nodes)
+        if not is_zero_matrix(buffer, nodes, p.base_rows):
             raise Exception("Wrong value of C^(-1) * A_(XB)")
         if not is_identity_matrix(p.b_inverse_adj, p.base_columns):
             raise Exception("YB x YB submatrix of C^(-1) * A_(XB) is not identity")
 
         # Test F-matrix in base set
-        copy_matrix(p.adj_b_inv_adj, buffer, p.nodes, p.nodes)
-        add_matrix(p.adjacencies, buffer, p.nodes, p.nodes)
-        add_product_matrix(p.adj_b_inverse, p.adjacencies, buffer, p.nodes, p.base_rows, p.nodes)
-        if not is_zero_matrix(buffer, p.nodes, p.nodes):
+        copy_matrix(p.adj_b_inv_adj, buffer, nodes, nodes)
+        add_matrix(adjacencies, buffer, nodes, nodes)
+        add_product_matrix(p.adj_b_inverse, adjacencies, buffer, nodes, p.base_rows, nodes)
+        if not is_zero_matrix(buffer, nodes, nodes):
             raise Exception("Wrong value of A^(YB) * C^(-1) * A_(XB) + A")
-        if not is_zero_matrix(p.adj_b_inv_adj, p.base_rows, p.nodes):
+        if not is_zero_matrix(p.adj_b_inv_adj, p.base_rows, nodes):
             raise Exception("XB rows of A^(YB) * C^(-1) * A_(XB) + A is not zero")
-        if not is_zero_matrix(p.adj_b_inv_adj, p.nodes, p.base_columns):
+        if not is_zero_matrix(p.adj_b_inv_adj, nodes, p.base_columns):
             raise Exception("YB columns of A^(YB) * C^(-1) * A_(XB) + A is not zero")
 
         # Test that all other rows and columns in adjacency matrix between partition sets is generated by C
-        copy_matrix(p.adjacencies, buffer, p.free_rows, p.free_columns)
+        copy_matrix(adjacencies, buffer, p.free_rows, p.free_columns)
         insert_zero_matrix(buffer, p.free_rows, p.base_rows)
-        add_product_matrix(p.adjacencies, p.base_inverse, buffer, p.free_rows, p.base_columns, p.base_rows)
-        add_product_matrix(buffer, p.adjacencies, buffer, p.free_rows, p.base_rows, p.free_columns)
+        add_product_matrix(adjacencies, p.base_inverse, buffer, p.free_rows, p.base_columns, p.base_rows)
+        add_product_matrix(buffer, adjacencies, buffer, p.free_rows, p.base_rows, p.free_columns)
         if not is_zero_matrix(buffer, p.free_rows, p.free_columns):
             raise Exception("Not a full rank matrix")
 
@@ -295,8 +298,8 @@ class CutRankCalculatorComparer:
 
     def __init__(self, partition : GraphPartition):
         self.partition = partition
-        self.first_cut_ranks = create_zero_matrix(partition.nmb_nodes, partition.nmb_nodes)
-        self.second_cut_ranks = create_zero_matrix(partition.nmb_nodes, partition.nmb_nodes)
+        self.first_cut_ranks = create_zero_matrix(partition.graph.nmb_nodes, partition.graph.nmb_nodes)
+        self.second_cut_ranks = create_zero_matrix(partition.graph.nmb_nodes, partition.graph.nmb_nodes)
         self.reset()
 
     def reset(self) -> None:
@@ -310,13 +313,13 @@ class CutRankCalculatorComparer:
         name = collector.name()
         is_first = self.is_reset()
         if is_first:
-            set_common_matrix_value(-1, self.first_cut_ranks, self.partition.nodes, self.partition.nodes)
+            set_common_matrix_value(-1, self.first_cut_ranks, self.partition.graph.nodes, self.partition.graph.nodes)
             self.first_calculations_name = name
             start = time.time()
             collector.collect_ranks(self.first_cut_ranks)
             end = time.time()
         else:
-            set_common_matrix_value(-1, self.second_cut_ranks, self.partition.nodes, self.partition.nodes)
+            set_common_matrix_value(-1, self.second_cut_ranks, self.partition.graph.nodes, self.partition.graph.nodes)
             start = time.time()
             collector.collect_ranks(self.second_cut_ranks)
             end = time.time()
@@ -350,8 +353,8 @@ class CutRankCalculatorComparer:
                         print(f"Cut-rank for position ({row},{col}) is {rank}, should be -1 since {row} is not a row position and {col} is not a column position")
                         raise Exception("Cut-rank set outside Rows x Columns")
         else:
-            for i in self.partition.nodes:
-                for j in self.partition.nodes:
+            for i in self.partition.graph.nodes:
+                for j in self.partition.graph.nodes:
                     if self.first_cut_ranks[i][j] != self.second_cut_ranks[i][j]:
                         print(f"Cut-rank mismatch for position ({i},{j}):")
                         print(f"   {self.first_calculations_name}: {self.first_cut_ranks[i][j]}")

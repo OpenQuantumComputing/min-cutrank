@@ -3,7 +3,7 @@ from min_cutrank.matrix_tools import create_zero_matrix, insert_zero_matrix, cop
 class GraphPartition:
 
     """
-    A representation of a simple graph and a partition of the nodes of the graph into two sets, identified as the rows and columns.
+    A representation of a simple graph and two nonintersectiong subsets, identified as the rows and columns.
     """
 
     nmb_nodes : int
@@ -11,9 +11,6 @@ class GraphPartition:
 
     nodes : list[int]
     """List of all nodes, i.e. the range from 0 to nmb_nodes exclusive."""
-
-    row_flag : list[bool]
-    """Flag telling which partition set each node belongs to. True for partition set 1 (rows), False for partition set 2 (columns)."""
 
     rows : list[int]
     """The nodes in the first partition set."""
@@ -28,22 +25,28 @@ class GraphPartition:
     """The cut-rank from the current partition."""
 
     base_rows : list[int]
-    """The nodes from first partition set that represent rows in the invertible cut-rank submatrix of the adjacency matrix. Same as nodes n where row_flag[n] = True and base_falg[n] is True. Length should equal cut_rank."""
+    """The nodes in the first subset that represent rows in the invertible cut-rank submatrix of the adjacency matrix. 
+    Same as rows where base_flag[n] is True. Length should equal cut_rank."""
 
     base_columns : list[int]
-    """The nodes from second partition set that represent columns in the invertible cut-rank submatrix of the adjacency matrix. Same as nodes n where row_flag[n] = False and base_falg[n] is True. Length should equal cut_rank."""
+    """The nodes in the second subset that represent columns in the invertible cut-rank submatrix of the adjacency matrix. 
+    Same as columns where base_flag[n] is True. Length should equal cut_rank."""
 
     free_rows : list[int]
-    """The nodes from first partition set that represent rows outside the invertible cut-rank submatrix of the adjacency matrix. Same as nodes n where row_flag[n] = True and base_falg[n] is False."""
+    """The nodes in the first subset that represent rows outside the invertible cut-rank submatrix of the adjacency matrix. 
+    Same as rows where base_flag[n] is False."""
 
     free_columns : list[int]
-    """The nodes from second partition set that represent columns outside the invertible cut-rank submatrix of the adjacency matrix. Same as nodes n where row_flag[n] = True and base_falg[n] is False."""
+    """The nodes in the second subset that represent columns outside the invertible cut-rank submatrix of the adjacency matrix. 
+    Same as colunms where base_flag[n] is False."""
 
     adjacencies : list[list[int]]
-    """The adjacency matrix of the grap. Should be a square symetric matrix with a row and column for each graph node, 0 on main diagonal, 1 in position (i,j) if (i,j) is an edge in the graph, 0 if not."""
+    """The adjacency matrix of the graph. Should be a square symetric matrix with a row and column for each graph node, 
+    0 on main diagonal, 1 in position (i,j) if (i,j) is an edge in the graph, 0 if not."""
 
     base_inverse : list[list[int]]
-    """A square nmb_nodes x nmb_nodes matrix where the base_columns x base_rows submatrix is the inverse of the base_rows x base_columns submatrix of the adjacency matrix that defines the selected cut-rank sub-matrix of the current partition."""
+    """A square nmb_nodes x nmb_nodes matrix where the base_columns x base_rows submatrix is 'C^(-1)', the inverse of 
+    the base_rows x base_columns submatrix of the adjacency matrix that defines the selected cut-rank sub-matrix of the current partition."""
 
     adj_b_inverse: list[list[int]]
     """A square nmb_nodes x nmb_nodes matrix where the nodes x base_rows submatrix represents 'D = A^{base_columns} * C^(-1)' used in the cut-rank calculations."""
@@ -57,15 +60,25 @@ class GraphPartition:
     buffer : list[list[int]]
     """A square nmb_nodes x nmb_nodes used for caching intermediate calculations when updating the variables after the partition has been changed."""
 
+    def fromFlags(adjacencies : list[list[int]], row_flags : list[bool], column_flags : list[bool] = None) -> 'GraphPartition':
+        """Creates a GraphPartition from the adjacency matrix and flags for which nodes belong to the rows and columns.
+        If the column_flags is not given, it is assumed to be the negation of the row_flags.
+        """
+        column_flags = column_flags if column_flags is not None else [not flag for flag in row_flags]
 
-    def __init__(self, adjacencies : list[list[int]], partition_flags : list[bool]):
+        nodes = list(range(len(adjacencies)))
+        rows = [n for n in nodes if row_flags[n]]
+        columns = [n for n in nodes if column_flags[n]]
+
+        return GraphPartition(adjacencies, rows, columns)
+
+    def __init__(self, adjacencies : list[list[int]], rows : list[int], columns : list[int] = None):
         self.adjacencies = adjacencies
         self.nmb_nodes = len(adjacencies)
         self.nodes = list(range(self.nmb_nodes))
 
-        self.row_flag = partition_flags[:]
-        self.rows = [n for n in self.nodes if self.row_flag[n]]
-        self.columns = [n for n in self.nodes if not self.row_flag[n]]
+        self.rows = rows[:]
+        self.columns = columns[:]
 
         self._build_matrices()
 
@@ -196,7 +209,6 @@ class GraphPartition:
         copy_matrix(other.adj_b_inverse, self.adj_b_inverse, other.nodes, other.nodes)
         copy_matrix(other.b_inverse_adj, self.b_inverse_adj, other.nodes, other.nodes)
         copy_matrix(other.adj_b_inv_adj, self.adj_b_inv_adj, other.nodes, other.nodes)
-        self.row_flag[:] = other.row_flag[:]
         self.base_flag[:] = other.base_flag[:]
         self.rows[:] = other.rows[:]
         self.columns[:] = other.columns[:]
@@ -597,8 +609,6 @@ class GraphPartition:
                                                 add_columns = []
 
         # Set new set of rows and columns
-        self.row_flag[row] = False
-        self.row_flag[column] = True
         row_idx = next(i for i in range(len(self.rows)) if self.rows[i] == row)
         col_idx = next(i for i in range(len(self.columns)) if self.columns[i] == column)
         self.rows[row_idx] = column

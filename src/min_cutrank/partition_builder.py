@@ -33,13 +33,19 @@ def random_graph(nodes : int, edge_probability : float) -> list[list[int]]:
     return adj_mat
 
 
-def random_partition(adjacency_matrix : list[list[int]], portion : float) -> GraphPartition:
+def random_partition(adjacency_matrix : list[list[int]], portion1 : float, portion2 : float = None) -> GraphPartition:
+
+    portion1and2 = 1 if portion2 == None else portion1 + portion2
 
     nmb_nodes = len(adjacency_matrix)
-    nmb_part1 = round(nmb_nodes * portion)
-    partition_flags = [True] * nmb_part1 + [False] * (nmb_nodes - nmb_part1)
-    random.shuffle(partition_flags)
-    return GraphPartition(adjacency_matrix, partition_flags)
+    nodes = [n for n in range(nmb_nodes)]
+    random.shuffle(nodes)
+    
+    nmb_part1 = round(nmb_nodes * portion1)
+    nmb_part1and2 = round(nmb_nodes * portion1and2)
+    part1 = nodes[0:nmb_part1]
+    part2 = nodes[nmb_part1:nmb_part1and2]
+    return GraphPartition(adjacency_matrix, part1, part2)
 
 
 def random_partition_on_random_graph(nodes : int, edge_probability : float, portion : float) -> GraphPartition:

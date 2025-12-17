@@ -77,7 +77,7 @@ def temperatures_from_description(description : str) -> np.ndarray[float]:
 
 
 def clone_partition(partition : GraphPartition) -> GraphPartition:
-    return GraphPartition(partition.adjacencies, partition.row_flag)
+    return GraphPartition(partition.adjacencies, partition.rows, partition.columns)
 
 
 class RankCollector:
@@ -197,32 +197,40 @@ class ApplySwapRankCollector(RankCollector):
         # Equally many base rows and base columns
         p = self.partition
         buffer = p.buffer
+
+        row_flag = self.buffer_flag
+        for n in p.rows:
+            row_flag[n] = True
+        for n in p.columns:
+            if row_flag[n]:
+                raise Exception("Node used both as row and column")
+
         for n in p.base_rows:
-            if not p.base_flag[n] or not p.row_flag[n]:
+            if not p.base_flag[n] or not row_flag[n]:
                 raise Exception("Unexpected element in base_rows")
-            if self.buffer_flag[n]:
-                raise Exception("Node used several times in partition sets")
-            self.buffer_flag[n] = True
-        for n in p.base_columns:
-            if not p.base_flag[n] or p.row_flag[n]:
-                raise Exception("Unexpected element in base_columns")
-            if self.buffer_flag[n]:
-                raise Exception("Node used several times in partition sets")
-            self.buffer_flag[n] = True
+            row_flag[n] = False
         for n in p.free_rows:
-            if p.base_flag[n] or not p.row_flag[n]:
+            if p.base_flag[n] or not row_flag[n]:
                 raise Exception("Unexpected element in free_rows")
-            if self.buffer_flag[n]:
-                raise Exception("Node used several times in partition sets")
-            self.buffer_flag[n] = True
+            row_flag[n] = False
+        if any(row_flag):
+            raise Exception("Row not classified as base or free")
+
+        column_flag = self.buffer_flag
+        for n in p.columns:
+            column_flag[n] = True
+
+        for n in p.base_columns:
+            if not p.base_flag[n] or not column_flag[n]:
+                raise Exception("Unexpected element in base_columns")
+            column_flag[n] = False
         for n in p.free_columns:
-            if p.base_flag[n] or p.row_flag[n]:
+            if p.base_flag[n] or not column_flag[n]:
                 raise Exception("Unexpected element in free_columns")
-            if self.buffer_flag[n]:
-                raise Exception("Node used several times in partition sets")
-            self.buffer_flag[n] = True
-        if not all(self.buffer_flag):
-            raise Exception("Not all nodes found in partition sets")
+            column_flag[n] = False
+        if any(column_flag):
+            raise Exception("Column not classified as base or free")
+        
         if p.cut_rank != len(p.base_rows):
             raise Exception("Number of base rows differs from cut-rank")
         if p.cut_rank != len(p.base_columns):
@@ -297,7 +305,7 @@ class CutRankCalculatorComparer:
     def is_reset(self) -> bool:
         return self.first_calculations_name == None
 
-    def calculate_and_compare(self, collector : RankCollector) -> None:
+    def calculate_and_compare(self, collector : RankCollector, log: bool = True) -> None:
 
         name = collector.name()
         is_first = self.is_reset()
@@ -313,7 +321,8 @@ class CutRankCalculatorComparer:
             collector.collect_ranks(self.second_cut_ranks)
             end = time.time()
 
-        print(f"Cut rank method '{name}' executed in {end - start} sec")
+        if log:
+            print(f"Cut rank method '{name}' executed in {end - start} sec")
 
         if is_first:
             p_rank = self.partition.cut_rank
@@ -360,7 +369,7 @@ def triangle_example() -> GraphPartition:
     set_edge(matr, 4, 5)
     set_edge(matr, 0, 3)
     partition_flags = [True, True, False, True, False, False]
-    return GraphPartition(matr, partition_flags)
+    return GraphPartition.fromFlags(matr, partition_flags)
 
 
 

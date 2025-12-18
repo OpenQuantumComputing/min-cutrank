@@ -56,7 +56,7 @@ def cut_rank_annealing_row_formula(partition : GraphPartition, temperatures, log
             row = rows[i]
             for n in partition.graph.nodes:
                 row_ranks[n] = -1
-            row_swap_cut_ranks(partition, row, row_ranks)
+            row_swap_cut_ranks(partition, row, cols, True, True, row_ranks)
             swap_col = -1
             for j in range(nmb_cols):
 
@@ -70,7 +70,7 @@ def cut_rank_annealing_row_formula(partition : GraphPartition, temperatures, log
                     cut_rank = new_cut_rank
 
             if swap_col >= 0:
-                partition.apply_swap(row, swap_col)
+                partition.apply_swap(row, swap_col, True, True)
             if partition.cut_rank != cut_rank:
                 raise Exception("Partition cut-rank does not fit with directly calculated rank")
 

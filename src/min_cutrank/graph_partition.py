@@ -220,8 +220,35 @@ class GraphPartition:
         self.free_columns[:] = other.free_columns[:]
 
 
-    def apply_swap(self, row : int, column : int) -> None:
+    def are_in_partition(self, rows, columns):
+        rows_are_in_partition = all(row in self.rows for row in rows)
+        if not rows_are_in_partition:
+            if any(row in self.rows for row in rows):
+                raise Exception("Rows are partially in partition")
+            if any(row in self.columns for row in rows):
+                raise Exception("Rows overlap partition columns")
+            
+        columns_are_in_partition = all(col in self.columns for col in columns)
+        if not columns_are_in_partition:
+            if any(col in self.columns for col in columns):
+                raise Exception("Columns are partially in partition")
+            if any(col in self.rows for col in columns):
+                raise Exception("Columns overlap partition rows")
 
+        return rows_are_in_partition, columns_are_in_partition
+
+
+    def base_changes(self, row, column, row_is_in_partition: bool, column_is_in_partition: bool) -> tuple[list[int], list[int], list[int], list[int]]:
+        """Returns changes to the row and column bases when swapping the given row and column for this partition.
+        
+        args:
+            - row: 'int' The row to be swapped.
+            - column: 'int' The column to be swapped.
+            - row_is_in_partition: 'bool' If true, row will be removed from self.rows and column will be added instead.
+                If false, row is not among self.rows or self.columns. Thus, it is not in the row base, and column cannot enter the row base.
+            - column_is_in_partition: 'bool' If true, column will be removed from self.columns and row will be added instead.
+                If false, column is not among self.rows or self.columns. Thus, it is not in the column base, and row cannot enter the column base.
+        """
         remove_rows : list[int]
         remove_columns : list[int]
         add_rows : list[int]
@@ -235,8 +262,8 @@ class GraphPartition:
                 remove_rows = []
                 remove_columns = []
 
-                k2 = next((k2 for k2 in self.free_rows if k2 != row and self.adj_b_inv_adj[k2][row] == 1), -1)
-                l2 = next((l2 for l2 in self.free_columns if l2 != column and self.adj_b_inv_adj[column][l2] == 1), -1)
+                k2 = next((k2 for k2 in self.free_rows if k2 != row and self.adj_b_inv_adj[k2][row] == 1), -1) if column_is_in_partition else -1
+                l2 = next((l2 for l2 in self.free_columns if l2 != column and self.adj_b_inv_adj[column][l2] == 1), -1) if row_is_in_partition else -1
                 if k2 >= 0:
                     if l2 >= 0:
                         add_rows = [column, k2]
@@ -249,7 +276,7 @@ class GraphPartition:
                         add_rows = [column]
                         add_columns = [l2]
                     else:
-                        if self.adj_b_inv_adj[column][row] == 1:
+                        if column_is_in_partition and row_is_in_partition and self.adj_b_inv_adj[column][row] == 1:
                             add_rows = [column]
                             add_columns = [row]
                         else:
@@ -266,9 +293,9 @@ class GraphPartition:
                 k1 = next((k1 for k1 in self.free_rows if self.adj_b_inverse[k1][row] == 1), -1)
                 if k1 >= 0:
                     if self.adj_b_inv_adj[k1][row] == 1:
-                        k2 = next((k2 for k2 in self.free_rows if k2 != k1 and self.adj_b_inv_adj[k2][row] != self.adj_b_inverse[k2][row]), -1)
+                        k2 = next((k2 for k2 in self.free_rows if k2 != k1 and self.adj_b_inv_adj[k2][row] != self.adj_b_inverse[k2][row]), -1) if column_is_in_partition else -1
                     else:
-                        k2 = next((k2 for k2 in self.free_rows if k2 != k1 and self.adj_b_inv_adj[k2][row] == 1), -1)
+                        k2 = next((k2 for k2 in self.free_rows if k2 != k1 and self.adj_b_inv_adj[k2][row] == 1), -1) if column_is_in_partition else -1
                     l2 = next((l2 for l2 in self.free_columns if l2 != column and self.adj_b_inv_adj[column][l2] == 1), -1)
                     if k2 >= 0:
                         if l2 >= 0:
@@ -282,14 +309,14 @@ class GraphPartition:
                             add_rows = [column, k1]
                             add_columns = [l2, alpha]
                         else:
-                            if self.adj_b_inv_adj[column][row] != (self.adj_b_inverse[column][row] & self.adj_b_inv_adj[k1][row]):
+                            if column_is_in_partition and self.adj_b_inv_adj[column][row] != (self.adj_b_inverse[column][row] & self.adj_b_inv_adj[k1][row]):
                                 add_rows = [column, k1]
                                 add_columns = [row, alpha]
                             else:
                                 add_rows = [k1]
                                 add_columns = [alpha]
                 else:
-                    k2 = next((k2 for k2 in self.free_rows if self.adj_b_inv_adj[k2][row] == 1), -1)
+                    k2 = next((k2 for k2 in self.free_rows if self.adj_b_inv_adj[k2][row] == 1), -1) if column_is_in_partition else -1
                     if self.adj_b_inverse[column][row] == 1:
                         if k2 >= 0:
                             add_rows = [column, k2]
@@ -311,7 +338,7 @@ class GraphPartition:
                                 add_rows = [column]
                                 add_columns = [l2]
                             else:
-                                if self.adj_b_inv_adj[column][row] == 1:
+                                if column_is_in_partition and self.adj_b_inv_adj[column][row] == 1:
                                     add_rows = [column]
                                     add_columns = [row]
                                 else:
@@ -334,7 +361,7 @@ class GraphPartition:
                     else:
                         l2 = next((l2 for l2 in self.free_columns if l2 != l1 and self.adj_b_inv_adj[column][l2] == 1), -1)
                     k2 = next((k2 for k2 in self.free_rows if k2 != row and self.adj_b_inv_adj[k2][row] == 1), -1)
-                    if l2 >= 0:
+                    if l2 >= 0 and row_is_in_partition:
                         if k2 >= 0:
                             add_rows = [column, k2, beta]
                             add_columns = [row, l1, l2]
@@ -346,14 +373,14 @@ class GraphPartition:
                             add_rows = [k2, beta]
                             add_columns = [row, l1]
                         else:
-                            if self.adj_b_inv_adj[column][row] != (self.b_inverse_adj[column][row] & self.adj_b_inv_adj[column][l1]):
+                            if self.adj_b_inv_adj[column][row] != (self.b_inverse_adj[column][row] & self.adj_b_inv_adj[column][l1]) and row_is_in_partition:
                                 add_rows = [column, beta]
                                 add_columns = [row, l1]
                             else:
                                 add_rows = [beta]
                                 add_columns = [l1]
                 else:
-                    l2 = next((l2 for l2 in self.free_columns if self.adj_b_inv_adj[column][l2] == 1), -1)
+                    l2 = next((l2 for l2 in self.free_columns if self.adj_b_inv_adj[column][l2] == 1), -1) if row_is_in_partition else -1
                     if self.b_inverse_adj[column][row] == 1:
                         if l2 >= 0:
                             add_rows = [column, beta]
@@ -375,7 +402,7 @@ class GraphPartition:
                                 add_rows = [k2]
                                 add_columns = [row]
                             else:
-                                if self.adj_b_inv_adj[column][row] == 1:
+                                if self.adj_b_inv_adj[column][row] == 1 and row_is_in_partition:
                                     add_rows = [column]
                                     add_columns = [row]
                                 else:
@@ -608,12 +635,21 @@ class GraphPartition:
                                             else:
                                                 add_rows = []
                                                 add_columns = []
+                                                
+        return remove_rows, remove_columns, add_rows, add_columns
+
+
+    def apply_swap(self, row : int, column : int, row_is_in_partition: bool, column_is_in_partition: bool) -> None:
+
+        remove_rows, remove_columns, add_rows, add_columns = self.base_changes(row, column, row_is_in_partition, column_is_in_partition)
 
         # Set new set of rows and columns
-        row_idx = next(i for i in range(len(self.rows)) if self.rows[i] == row)
-        col_idx = next(i for i in range(len(self.columns)) if self.columns[i] == column)
-        self.rows[row_idx] = column
-        self.columns[col_idx] = row
+        if row_is_in_partition:
+            row_idx = self.rows.index(row)
+            self.rows[row_idx] = column
+        if column_is_in_partition:
+            col_idx = self.columns.index(column)
+            self.columns[col_idx] = row
 
         # Apply reduction and extension
         self._reduce_base(remove_rows, remove_columns)

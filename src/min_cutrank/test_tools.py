@@ -82,15 +82,22 @@ def clone_partition(partition : GraphPartition) -> GraphPartition:
 
 class RankCollector:
 
-    def collect_ranks(self, cut_ranks : list[list[int]]) -> None:
+    partition : GraphPartition
+
+    def collect_ranks(self, cut_ranks : list[list[int]], rows_to_swap: list[int], columns_to_swap: list[int]) -> None:
         pass
     def name(self) -> str:
         return None
 
+def swap(list, item1, item2):
+    for i in range(len(list)):
+        if list[i] == item1:
+            list[i] = item2
+        elif list[i] == item2:
+            list[i] = item1
+
 
 class DirectSwapRankCollector(RankCollector):
-
-    partition : GraphPartition
 
     buffer : list[list[int]]
 
@@ -98,26 +105,24 @@ class DirectSwapRankCollector(RankCollector):
         self.partition = partition
         self.buffer = create_zero_matrix(partition.graph.nmb_nodes, partition.graph.nmb_nodes)
 
-    def collect_ranks(self, cut_ranks : list[list[int]]) -> None:
+    def collect_ranks(self, cut_ranks : list[list[int]], rows_to_swap: list[int], columns_to_swap: list[int]) -> None:
         rows_copy = self.partition.rows[:]
         cols_copy = self.partition.columns[:]
-        for i in range(len(self.partition.rows)):
-            row = self.partition.rows[i]
-            for j in range(len(self.partition.columns)):
-                col = self.partition.columns[j]
-                rows_copy[i], cols_copy[j] = col, row
+        for row in rows_to_swap:
+            for col in columns_to_swap:
+                swap(rows_copy, row, col)
+                swap(cols_copy, row, col)
                 copy_matrix(self.partition.graph.adjacencies, self.buffer, rows_copy, cols_copy)
                 base_rows, _ = rank_matrix_positions(self.buffer, rows_copy, cols_copy)
                 cut_ranks[row][col] = len(base_rows)
-                rows_copy[i], cols_copy[j] = row, col
+                swap(rows_copy, row, col)
+                swap(cols_copy, row, col)
 
     def name(self) -> str:
         return "Gauss-Jordan elimination rank calculation"
 
 
 class FormulaRankCollector(RankCollector):
-
-    partition : GraphPartition
 
     single_ranks : bool
 
@@ -127,17 +132,21 @@ class FormulaRankCollector(RankCollector):
         self.partition = partition
         self.single_ranks = single_ranks
         self.row_ranks = row_ranks and not single_ranks
+        self.call_count = 0
 
-    def collect_ranks(self, cut_ranks : list[list[int]]) -> None:
+    def collect_ranks(self, cut_ranks : list[list[int]], rows_to_swap: list[int], columns_to_swap: list[int]) -> None:
+        
+        rows_are_in_partition, columns_are_in_partition = self.partition.are_in_partition(rows_to_swap, columns_to_swap)
+        
         if self.single_ranks:
-            for row in self.partition.rows:
-                for col in self.partition.columns:
-                    cut_ranks[row][col] = single_swap_cut_rank(self.partition, row, col)
+            for row in rows_to_swap:
+                for col in columns_to_swap:
+                    cut_ranks[row][col] = single_swap_cut_rank(self.partition, row, col, rows_are_in_partition, columns_are_in_partition)
         elif self.row_ranks:
-            for row in self.partition.rows:
-                row_swap_cut_ranks(self.partition, row, cut_ranks[row])
+            for row in rows_to_swap:
+                row_swap_cut_ranks(self.partition, row, columns_to_swap, rows_are_in_partition, columns_are_in_partition, cut_ranks[row])
         else:
-            all_swap_cut_ranks(self.partition, cut_ranks)
+            all_swap_cut_ranks(self.partition, rows_to_swap, columns_to_swap, rows_are_in_partition, columns_are_in_partition, cut_ranks)
 
     def name(self) -> str:
         return "Single ranks by formulas" if self.single_ranks else ("Row ranks by formulas" if self.row_ranks else "All ranks by formulas")
@@ -161,8 +170,6 @@ def print_matrix(heading : str, matrix : list[list[int]]):
 
 class ApplySwapRankCollector(RankCollector):
 
-    partition : GraphPartition
-
     backup : GraphPartition
 
     validate : bool
@@ -176,11 +183,12 @@ class ApplySwapRankCollector(RankCollector):
         self.validate = validate
         self.buffer_flag = [False] * partition.graph.nmb_nodes
 
-    def collect_ranks(self, cut_ranks : list[list[int]]) -> None:
+    def collect_ranks(self, cut_ranks : list[list[int]], rows_to_swap: list[int], columns_to_swap: list[int]) -> None:
         self.backup.copy(self.partition)
-        for row in self.backup.rows:
-            for col in self.backup.columns:
-                self.partition.apply_swap(row, col)
+        rows_in, cols_in = self.partition.are_in_partition(rows_to_swap, columns_to_swap)
+        for row in rows_to_swap:
+            for col in columns_to_swap:
+                self.partition.apply_swap(row, col, rows_in, cols_in)
                 cut_ranks[row][col] = self.partition.cut_rank
                 if self.validate:
                     self._validate_partition()
@@ -281,17 +289,22 @@ class ApplySwapRankCollector(RankCollector):
         if not is_zero_matrix(buffer, p.free_rows, p.free_columns):
             raise Exception("Not a full rank matrix")
 
-    def _copy_list(self, from_l : list, to_l : list) -> None:
-        for i in range(len(from_l)):
-            to_l[i] = from_l[i]
-
 class CutRankCalculatorComparer:
 
     partition : GraphPartition
+    """The partition for which to calculate cut rank deltas."""
+
+    rows: list[int]
+    """The rows to calculate for."""
+
+    columns: list[int]
+    """The columns to calculate for."""
 
     first_cut_ranks : list[list[int]]
+    """The cut-ranks calculated in the first calculation pass."""
 
     second_cut_ranks : list[list[int]]
+    """The cut-ranks calculated in the second calculation pass."""
 
     first_calculations_name : str
 
@@ -299,10 +312,11 @@ class CutRankCalculatorComparer:
         self.partition = partition
         self.first_cut_ranks = create_zero_matrix(partition.graph.nmb_nodes, partition.graph.nmb_nodes)
         self.second_cut_ranks = create_zero_matrix(partition.graph.nmb_nodes, partition.graph.nmb_nodes)
-        self.reset()
 
-    def reset(self) -> None:
+    def reset(self, rows: list[int], columns: list[int]) -> None:
         self.first_calculations_name = None
+        self.rows = rows
+        self.columns = columns
 
     def is_reset(self) -> bool:
         return self.first_calculations_name == None
@@ -315,12 +329,12 @@ class CutRankCalculatorComparer:
             set_common_matrix_value(-1, self.first_cut_ranks, self.partition.graph.nodes, self.partition.graph.nodes)
             self.first_calculations_name = name
             start = time.time()
-            collector.collect_ranks(self.first_cut_ranks)
+            collector.collect_ranks(self.first_cut_ranks, self.rows, self.columns)
             end = time.time()
         else:
             set_common_matrix_value(-1, self.second_cut_ranks, self.partition.graph.nodes, self.partition.graph.nodes)
             start = time.time()
-            collector.collect_ranks(self.second_cut_ranks)
+            collector.collect_ranks(self.second_cut_ranks, self.rows, self.columns)
             end = time.time()
 
         if log:
@@ -329,8 +343,8 @@ class CutRankCalculatorComparer:
         if is_first:
             p_rank = self.partition.cut_rank
             max_rank = min(len(self.partition.rows), len(self.partition.columns))
-            for row in self.partition.rows:
-                for col in self.partition.columns:
+            for row in self.rows:
+                for col in self.columns:
                     rank = self.first_cut_ranks[row][col]
                     if rank < 0 or rank > max_rank:
                         print(f"Cut-rank for position ({row},{col}) is {rank}, outside allowed range of [0,{max_rank}]")
@@ -338,16 +352,16 @@ class CutRankCalculatorComparer:
                     if rank < p_rank - 2 or rank > p_rank + 2:
                         print(f"Cut-rank for position ({row},{col}) is {rank}, too far from current cut-rank {p_rank}")
                         raise Exception("New cut-rank too far from current cut-rank")
-                for col in self.partition.rows:
+                for col in self.rows:
                     if self.first_cut_ranks[row][col] != -1:
                         print(f"Cut-rank for position ({row},{col}) is {rank}, should be -1 since {col} is not a column position")
                         raise Exception("Cut-rank set outside Rows x Columns")
-            for row in self.partition.columns:
-                for col in self.partition.columns:
+            for row in self.columns:
+                for col in self.columns:
                     if self.first_cut_ranks[row][col] != -1:
                         print(f"Cut-rank for position ({row},{col}) is {rank}, should be -1 since {row} is not a row position")
                         raise Exception("Cut-rank set outside Rows x Columns")
-                for col in self.partition.rows:
+                for col in self.rows:
                     if self.first_cut_ranks[row][col] != -1:
                         print(f"Cut-rank for position ({row},{col}) is {rank}, should be -1 since {row} is not a row position and {col} is not a column position")
                         raise Exception("Cut-rank set outside Rows x Columns")
@@ -408,7 +422,7 @@ def run_greedy_min_rank(partition : GraphPartition, rank_calculation_methods: li
         print()
         print(f"Iteration {iteration} starting, current rank = {cut_rank}")
 
-        rank_comparer.reset()
+        rank_comparer.reset(partition.rows, partition.columns)
         for coll in rank_collectors:
             rank_comparer.calculate_and_compare(coll)
         if rank_comparer.is_reset():
@@ -420,9 +434,9 @@ def run_greedy_min_rank(partition : GraphPartition, rank_calculation_methods: li
                 new_rank_pos = rank_comparer.first_cut_ranks[row][col] + 2 - cut_rank
                 ranks_grouped[new_rank_pos].append((row, col))
         best_rank_pos = -1
-        for i in range(5):
-            if len(ranks_grouped[i]) > 0:
-                print(f"Cut-rank = {i + cut_rank - 2} for {len(ranks_grouped[i])} swaps")
+        for i, ranks_at_level in enumerate(ranks_grouped):
+            if len(ranks_at_level) > 0:
+                print(f"Cut-rank = {i + cut_rank - 2} for {len(ranks_at_level)} swaps")
                 if best_rank_pos == -1:
                     best_rank_pos = i
         local_minimum_found = best_rank_pos >= 2

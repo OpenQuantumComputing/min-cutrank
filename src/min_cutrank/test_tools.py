@@ -127,7 +127,6 @@ class FormulaRankCollector(RankCollector):
         self.partition = partition
         self.single_ranks = single_ranks
         self.row_ranks = row_ranks and not single_ranks
-        row_ranks = [0] * self.partition.graph.nmb_nodes
 
     def collect_ranks(self, cut_ranks : list[list[int]]) -> None:
         if self.single_ranks:

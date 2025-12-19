@@ -1,10 +1,11 @@
+from abc import ABC, abstractmethod
 import numpy as np
 import time
 import random
 from min_cutrank.graph import Graph, set_edge
 from min_cutrank.graph_partition import GraphPartition
 from min_cutrank.matrix_tools import create_zero_matrix, copy_matrix, rank_matrix_positions, set_common_matrix_value, insert_zero_matrix, add_matrix, add_product_matrix, is_zero_matrix, is_identity_matrix
-from min_cutrank.swap_rank_calculator import all_swap_cut_ranks, row_swap_cut_ranks, single_swap_cut_rank
+from min_cutrank.swap_rank_calculator import all_swap_cut_ranks, row_swap_cut_ranks, single_swap_cut_rank_delta
 
 
 def parse_int(value: str, default: int) -> int:
@@ -80,12 +81,14 @@ def clone_partition(partition : GraphPartition) -> GraphPartition:
     return GraphPartition(partition.graph, partition.rows, partition.columns)
 
 
-class RankCollector:
+class RankCollector(ABC):
 
     partition : GraphPartition
 
+    @abstractmethod
     def collect_ranks(self, cut_ranks : list[list[int]], rows_to_swap: list[int], columns_to_swap: list[int]) -> None:
         pass
+    @abstractmethod
     def name(self) -> str:
         return None
 
@@ -137,11 +140,12 @@ class FormulaRankCollector(RankCollector):
     def collect_ranks(self, cut_ranks : list[list[int]], rows_to_swap: list[int], columns_to_swap: list[int]) -> None:
         
         rows_are_in_partition, columns_are_in_partition = self.partition.are_in_partition(rows_to_swap, columns_to_swap)
+        old_rank = self.partition.cut_rank
         
         if self.single_ranks:
             for row in rows_to_swap:
                 for col in columns_to_swap:
-                    cut_ranks[row][col] = single_swap_cut_rank(self.partition, row, col, rows_are_in_partition, columns_are_in_partition)
+                    cut_ranks[row][col] = old_rank + single_swap_cut_rank_delta(self.partition, row, col, rows_are_in_partition, columns_are_in_partition)
         elif self.row_ranks:
             for row in rows_to_swap:
                 row_swap_cut_ranks(self.partition, row, columns_to_swap, rows_are_in_partition, columns_are_in_partition, cut_ranks[row])

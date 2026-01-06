@@ -16,7 +16,7 @@ def random_partition(graph: Graph, portion1 : float, portion2 : float = None) ->
     nmb_part1and2 = round(nmb_nodes * portion1and2)
     part1 = nodes[0:nmb_part1]
     part2 = nodes[nmb_part1:nmb_part1and2]
-    return GraphPartition(graph, part1, part2)
+    return GraphPartition(graph, [part1, part2])
 
 
 def random_partition_on_random_graph(nodes : int, edge_probability : float, portion : float) -> GraphPartition:

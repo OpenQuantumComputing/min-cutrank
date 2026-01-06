@@ -1,46 +1,46 @@
 from min_cutrank.graph import Graph
-from min_cutrank.matrix_tools import create_zero_matrix, insert_zero_matrix, copy_matrix, rank_matrix_positions, matrix_inverse, add_product_matrix
+from min_cutrank.matrix_tools import insert_zero_matrix, copy_matrix, rank_matrix_positions, matrix_inverse, add_product_matrix
 
-class GraphPartition:
 
+class SubMatrix:
+    """A matrix defined by a subset of rows and and a subset of columns in a larger matrix.
+    No row and column in the sub-matrix share the same index.
     """
-    A representation of a simple graph and two nonintersectiong subsets, identified as the rows and columns.
-    """
 
-    graph : Graph
-    """The graph being partitioned."""
-    
+    partition: 'GraphPartition'
+    """The graph partition this sub-matrix belongs to."""
+
     rows : list[int]
-    """The nodes in the first subset."""
+    """The row indices of the sub-matrix in the larger matrix."""
 
     columns : list[int]
-    """The nodes in the second subset."""
+    """The column indices of the sub-matrix in the larger matrix."""
 
     base_flag : list[bool]
-    """Flag telling if a node represents a row or column in the selected invertible cut-rank submatrix of the adjacency matrix."""
+    """Flag telling if an index represents a row or column in the selected invertible sub-sub-matrix of this sub-matrix."""
 
-    cut_rank : int
-    """The cut-rank of the current partition."""
+    rank : int
+    """The rank of the sub-matrix."""
 
     base_rows : list[int]
-    """The nodes in the first subset that represent rows in the invertible cut-rank submatrix of the adjacency matrix. 
-    Same as rows where base_flag[n] is True. Length should equal cut_rank."""
+    """The rows that are part of the invertible sub-sub-matrix of this sub-matrix. 
+    Same as rows where base_flag[n] is True. Length should equal rank."""
 
     base_columns : list[int]
-    """The nodes in the second subset that represent columns in the invertible cut-rank submatrix of the adjacency matrix. 
-    Same as columns where base_flag[n] is True. Length should equal cut_rank."""
+    """The columns that are part of the invertible sub-sub-matrix of this sub-matrix.
+    Same as columns where base_flag[n] is True. Length should equal rank."""
 
     free_rows : list[int]
-    """The nodes in the first subset that represent rows outside the invertible cut-rank submatrix of the adjacency matrix. 
+    """The rows in this sub-matric that are *not* part of the invertible sub-sub-matrix of this sub-matrix.
     Same as rows where base_flag[n] is False."""
 
     free_columns : list[int]
-    """The nodes in the second subset that represent columns outside the invertible cut-rank submatrix of the adjacency matrix. 
-    Same as colunms where base_flag[n] is False."""
+    """The columns in this sub-matrix that are *not* part of the invertible sub-sub-matrix of this sub-matrix.
+    Same as columns where base_flag[n] is False."""
 
     base_inverse : list[list[int]]
     """A square nmb_nodes x nmb_nodes matrix where the base_columns x base_rows submatrix is 'C^(-1)', the inverse of 
-    the base_rows x base_columns submatrix of the adjacency matrix that defines the selected cut-rank sub-matrix of the current partition."""
+    the base_rows x base_columns invertible sub-submatrix of the adjacency matrix."""
 
     adj_b_inverse: list[list[int]]
     """A square nmb_nodes x nmb_nodes matrix where the nodes x base_rows submatrix represents 'D = A^{base_columns} * C^(-1)' used in the cut-rank calculations."""
@@ -51,56 +51,36 @@ class GraphPartition:
     adj_b_inv_adj: list[list[int]]
     """The square nmb_nodes x nmb_nodes matrix 'F = A^{base_columns} * C^(-1) * A_{base_rows} + A' used in the cut-rank calculations."""
 
-    buffer : list[list[int]]
-    """A square nmb_nodes x nmb_nodes used for caching intermediate calculations when updating the variables after the partition has been changed."""
-
-    def fromFlags(graph: Graph, row_flags : list[bool], column_flags : list[bool] = None) -> 'GraphPartition':
-        """Creates a GraphPartition from the adjacency matrix and flags for which nodes belong to the rows and columns.
-        If the column_flags is not given, it is assumed to be the negation of the row_flags.
-        """
-        column_flags = column_flags if column_flags is not None else [not flag for flag in row_flags]
-
-        rows = [n for n in graph.nodes if row_flags[n]]
-        columns = [n for n in graph.nodes if column_flags[n]]
-
-        return GraphPartition(graph, rows, columns)
-
-    def __init__(self, graph: Graph, rows : list[int], columns : list[int] = None):
-        self.graph = graph
-
+    def __init__(self, partition: 'GraphPartition', rows : list[int], columns : list[int]):
+        self.partition = partition
         self.rows = rows[:]
         self.columns = columns[:]
 
         self._build_matrices()
 
 
-    def _empty_matrix(self) -> list[list[int]]:
-
-        return create_zero_matrix(self.graph.nmb_nodes, self.graph.nmb_nodes)
-
-
     def _build_matrices(self) -> None:
 
-        nodes = self.graph.nodes
-        adjacencies = self.graph.adjacencies
+        partition = self.partition
+        nodes = partition.graph.nodes
+        adjacencies = partition.graph.adjacencies
 
-        self.base_inverse = self._empty_matrix()
+        self.base_inverse = partition._empty_matrix()
         copy_matrix(adjacencies, self.base_inverse, self.rows, self.columns)
         (self.base_rows, self.base_columns) = rank_matrix_positions(self.base_inverse, self.rows, self.columns)
-        self.cut_rank = len(self.base_rows)
+        self.rank = len(self.base_rows)
         copy_matrix(adjacencies, self.base_inverse, self.base_rows, self.base_columns)
         matrix_inverse(self.base_inverse, self.base_inverse, self.base_rows, self.base_columns)
 
-        self.adj_b_inverse = self._empty_matrix()
+        self.adj_b_inverse = partition._empty_matrix()
         add_product_matrix(adjacencies, self.base_inverse, self.adj_b_inverse, nodes, self.base_columns, self.base_rows)
-        self.b_inverse_adj = self._empty_matrix()
+        self.b_inverse_adj = partition._empty_matrix()
         add_product_matrix(self.base_inverse, adjacencies, self.b_inverse_adj, self.base_columns, self.base_rows, nodes)
-        self.adj_b_inv_adj = self._empty_matrix()
+        self.adj_b_inv_adj = partition._empty_matrix()
         copy_matrix(adjacencies, self.adj_b_inv_adj, nodes, nodes)
         add_product_matrix(self.adj_b_inverse, adjacencies, self.adj_b_inv_adj, nodes, self.base_rows, nodes)
-        self.buffer = self._empty_matrix()
 
-        self.base_flag = [False] * self.graph.nmb_nodes
+        self.base_flag = [False] * self.partition.graph.nmb_nodes
         for r in self.base_rows:
             self.base_flag[r] = True
         for c in self.base_columns:
@@ -119,7 +99,8 @@ class GraphPartition:
         if len(removed_rows) == 0:
             return
 
-        nodes = self.graph.nodes
+        nodes = self.partition.graph.nodes
+        buffer = self.partition.buffer
             
         # Set base nodes
         for row in removed_rows:
@@ -128,21 +109,21 @@ class GraphPartition:
             self.base_flag[col] = False
         self.base_rows = [row for row in self.rows if self.base_flag[row]]
         self.base_columns = [col for col in self.columns if self.base_flag[col]]
-        self.cut_rank = len(self.base_rows)
+        self.rank = len(self.base_rows)
 
         # Get Z
-        copy_matrix(self.base_inverse, self.buffer, removed_cols, removed_rows)
-        matrix_inverse(self.buffer, self.buffer, removed_cols, removed_rows)
+        copy_matrix(self.base_inverse, buffer, removed_cols, removed_rows)
+        matrix_inverse(buffer, buffer, removed_cols, removed_rows)
 
         # Store D^(Delta X) * Z in D^(Delta Y), update D and F
         insert_zero_matrix(self.adj_b_inverse, nodes, removed_cols)
-        add_product_matrix(self.adj_b_inverse, self.buffer, self.adj_b_inverse, nodes, removed_rows, removed_cols)
+        add_product_matrix(self.adj_b_inverse, buffer, self.adj_b_inverse, nodes, removed_rows, removed_cols)
         add_product_matrix(self.adj_b_inverse, self.b_inverse_adj, self.adj_b_inv_adj, nodes, removed_cols, nodes)
         add_product_matrix(self.adj_b_inverse, self.base_inverse, self.adj_b_inverse, nodes, removed_cols, self.base_rows)
 
         # Store (C^-1)_YN^(Delta X) * Z in D^(Delta Y), update C^-1 and E
         insert_zero_matrix(self.adj_b_inverse, nodes, removed_cols)
-        add_product_matrix(self.base_inverse, self.buffer, self.adj_b_inverse, self.base_columns, removed_rows, removed_cols)
+        add_product_matrix(self.base_inverse, buffer, self.adj_b_inverse, self.base_columns, removed_rows, removed_cols)
         add_product_matrix(self.adj_b_inverse, self.b_inverse_adj, self.b_inverse_adj, self.base_columns, removed_cols, nodes)
         add_product_matrix(self.adj_b_inverse, self.base_inverse, self.base_inverse, self.base_columns, removed_cols, self.base_rows)
 
@@ -152,8 +133,9 @@ class GraphPartition:
         if len(added_rows) == 0:
             return
 
-        nodes = self.graph.nodes
-        adjacencies = self.graph.adjacencies
+        nodes = self.partition.graph.nodes
+        adjacencies = self.partition.graph.adjacencies
+        buffer = self.partition.buffer
 
         # Determine new base
         for row in added_rows:
@@ -164,19 +146,19 @@ class GraphPartition:
         new_base_columns = [col for col in self.columns if self.base_flag[col]]
 
         # Store Z in (C^-1)_(Delta Y)^(Delta X)
-        copy_matrix(adjacencies, self.buffer, added_rows, added_cols)  # Stores (C_N)_(Delta X)^(Delta Y) in position for Z-inverse
-        insert_zero_matrix(self.buffer, added_rows, self.base_rows)
-        add_product_matrix(adjacencies, self.base_inverse, self.buffer, added_rows, self.base_columns, self.base_rows)
-        add_product_matrix(self.buffer, adjacencies, self.buffer, added_rows, self.base_rows, added_cols)  # Gives Z-inverse
+        copy_matrix(adjacencies, buffer, added_rows, added_cols)  # Stores (C_N)_(Delta X)^(Delta Y) in position for Z-inverse
+        insert_zero_matrix(buffer, added_rows, self.base_rows)
+        add_product_matrix(adjacencies, self.base_inverse, buffer, added_rows, self.base_columns, self.base_rows)
+        add_product_matrix(buffer, adjacencies, buffer, added_rows, self.base_rows, added_cols)  # Gives Z-inverse
         insert_zero_matrix(self.base_inverse, added_cols, new_base_rows)
         insert_zero_matrix(self.base_inverse, self.base_columns, added_rows)
-        matrix_inverse(self.buffer, self.base_inverse, added_rows, added_cols)
+        matrix_inverse(buffer, self.base_inverse, added_rows, added_cols)
 
         # Get new C^1
-        insert_zero_matrix(self.buffer, self.base_columns, added_cols)
-        add_product_matrix(self.base_inverse, adjacencies, self.buffer, self.base_columns, self.base_rows, added_cols)
-        add_product_matrix(self.base_inverse, self.buffer, self.base_inverse, added_cols, added_rows, self.base_rows)
-        add_product_matrix(self.buffer, self.base_inverse, self.base_inverse, self.base_columns, added_cols, new_base_rows)
+        insert_zero_matrix(buffer, self.base_columns, added_cols)
+        add_product_matrix(self.base_inverse, adjacencies, buffer, self.base_columns, self.base_rows, added_cols)
+        add_product_matrix(self.base_inverse, buffer, self.base_inverse, added_cols, added_rows, self.base_rows)
+        add_product_matrix(buffer, self.base_inverse, self.base_inverse, self.base_columns, added_cols, new_base_rows)
 
         # Get new D
         copy_matrix(adjacencies, self.adj_b_inverse, nodes, added_cols)
@@ -191,20 +173,20 @@ class GraphPartition:
         add_product_matrix(self.base_inverse, self.b_inverse_adj, self.b_inverse_adj, new_base_columns, added_rows, nodes)
 
         # Get new F
-        insert_zero_matrix(self.buffer, added_cols, nodes)
-        add_product_matrix(self.base_inverse, self.b_inverse_adj, self.buffer, added_cols, added_rows, nodes)
-        add_product_matrix(self.adj_b_inverse, self.buffer, self.adj_b_inv_adj, nodes, added_cols, nodes)
+        insert_zero_matrix(buffer, added_cols, nodes)
+        add_product_matrix(self.base_inverse, self.b_inverse_adj, buffer, added_cols, added_rows, nodes)
+        add_product_matrix(self.adj_b_inverse, buffer, self.adj_b_inv_adj, nodes, added_cols, nodes)
 
         self.base_rows = new_base_rows
         self.base_columns = new_base_columns
-        self.cut_rank = len(self.base_rows)
+        self.rank = len(self.base_rows)
 
 
-    def copy(self, other: 'GraphPartition') -> None:
+    def copy(self, other: 'SubMatrix') -> None:
         """Copy all partition state from other into self."""
-        if self.graph != other.graph:
+        if self.partition.graph != other.partition.graph:
             raise Exception("Cannot copy partition from different graph")
-        nodes = self.graph.nodes
+        nodes = self.partition.graph.nodes
         
         copy_matrix(other.base_inverse, self.base_inverse, nodes, nodes)
         copy_matrix(other.adj_b_inverse, self.adj_b_inverse, nodes, nodes)
@@ -213,7 +195,7 @@ class GraphPartition:
         self.base_flag[:] = other.base_flag[:]
         self.rows[:] = other.rows[:]
         self.columns[:] = other.columns[:]
-        self.cut_rank = other.cut_rank
+        self.rank = other.rank
         self.base_rows[:] = other.base_rows[:]
         self.base_columns[:] = other.base_columns[:]
         self.free_rows[:] = other.free_rows[:]
@@ -639,7 +621,7 @@ class GraphPartition:
         return remove_rows, remove_columns, add_rows, add_columns
 
 
-    def apply_swap(self, row : int, column : int, row_is_in_partition: bool, column_is_in_partition: bool) -> None:
+    def apply_swap(self, row : int, column : int, row_is_in_partition: bool, column_is_in_partition: bool) -> int:
 
         remove_rows, remove_columns, add_rows, add_columns = self.base_changes(row, column, row_is_in_partition, column_is_in_partition)
 
@@ -657,3 +639,5 @@ class GraphPartition:
 
         # Update set of fre rows and free columns
         self._build_free_nodes()
+
+        return len(add_rows) - len(remove_rows)

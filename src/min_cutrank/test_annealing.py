@@ -4,13 +4,13 @@ import time
 import getopt
 import random
 from min_cutrank.cut_rank_annealing import cut_rank_annealing_direct, cut_rank_annealing_row_formula
-from min_cutrank.test_tools import parse_bool,parse_int, parse_float, graph_from_description, temperatures_from_description, clone_partition
+from min_cutrank.test_tools import parse_bool,parse_int, parse_float, graph_from_description, temperatures_from_description
 from min_cutrank.partition_builder import random_partition
 
 
 def test_annealing_method(annealing_method, name : str, partition, temperatures, log : bool) -> None:
     print(f"Testing annealing method '{name}'")
-    partition_copy = clone_partition(partition)
+    partition_copy = partition.clone()
     start = time.time()
     annealing_method(partition_copy, temperatures, log)
     end = time.time()

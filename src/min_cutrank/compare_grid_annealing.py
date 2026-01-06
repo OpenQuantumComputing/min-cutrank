@@ -4,13 +4,13 @@ import getopt
 import random
 import time
 from min_cutrank.graph import Graph
-from min_cutrank.test_tools import parse_int, parse_float, temperatures_from_description, clone_partition
+from min_cutrank.test_tools import parse_int, parse_float, temperatures_from_description
 from min_cutrank.partition_builder import random_partition
 from min_cutrank.cut_rank_annealing import cut_rank_annealing_direct, cut_rank_annealing_row_formula
 
 
 def run_annealing_method(annealing_method, partition, temperatures) -> None:
-    partition_copy = clone_partition(partition)
+    partition_copy = partition.clone()
     start_time = time.time()
     annealing_method(partition_copy, temperatures, False)
     time_total = time.time() - start_time

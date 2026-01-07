@@ -350,8 +350,299 @@ def row_swap_cut_ranks(partition : GraphPartition, row : int, columns_to_swap : 
     for i in range(len(partition.subsets)):
         if i != row_subset_index and row_subset_index != -1:
             add_row_swap_cut_rank_deltas(partition.matrices[row_subset_index][i], row, columns_to_swap, True, i == column_subset_index, ranks)
+            #add_col_swap_cut_rank_deltas(partition.matrices[i][row_subset_index], columns_to_swap, row, i == column_subset_index, True, ranks)
         if i != column_subset_index and i != row_subset_index and column_subset_index != -1:
             add_row_swap_cut_rank_deltas(partition.matrices[i][column_subset_index], row, columns_to_swap, False, True, ranks)
+            #add_col_swap_cut_rank_deltas(partition.matrices[column_subset_index][i], columns_to_swap, row, True, False, ranks)
+
+
+def add_col_swap_cut_rank_deltas(matrix : SubMatrix, rows_to_swap : list[int], column : int, rows_are_in_matrix: bool, column_is_in_matrix: bool, ranks : list[int]) -> None:
+    """Adds the change in rank for the sub-matrices obtained by swapping any of the given rows with the given column in the associated graph partition.
+    
+    args:
+        - matrix: 'SubMatrix' The sub-matrix.
+        - rows_to_swap: 'list[int]' The rows to be swapped.
+        - column: 'int' The column to be swapped.
+        - rows_are_in_matrix: 'bool' If true, each of rows_to_swap will be removed from matrix.rows and column will be added instead.
+            If false, rows_to_swap are not among the matrix's rows or columns. Thus, they are not in the row base, and column cannot enter the row base.
+        - column_is_in_matrix: 'bool' If true, column will be removed from matrix.columns and each of rows_to_swap will be added instead.
+            If false, column is not among the matrix's rows or columns. Thus, it is not in the column base, and rows_to_swap cannot enter the column base.
+        - ranks: 'list[int]' A list where position [i] represents the cut-rank after swapping 'i' and 'column'. 
+            Only positions where i is among rows_to_swap will be affected.
+    """
+
+    base_rows = matrix.base_rows if rows_are_in_matrix else []
+    free_rows = matrix.free_rows if rows_are_in_matrix else rows_to_swap
+
+    if (not matrix.base_flag[column]):
+
+        t2 = rows_are_in_matrix and any(l2 != column and matrix.adj_b_inv_adj[column][l2] == 1 for l2 in matrix.free_columns)
+        for row in free_rows:
+            # column in Y^D, row in X^D
+            s2 = column_is_in_matrix and any(k2 != row and matrix.adj_b_inv_adj[k2][row] == 1 for k2 in matrix.free_rows)
+            if t2:
+                if s2:
+                    ranks[row] += 2
+                else:
+                    ranks[row] += 1
+            else:
+                if s2:
+                    ranks[row] += 1
+                else:
+                    if column_is_in_matrix and rows_are_in_matrix and matrix.adj_b_inv_adj[column][row] == 1:
+                        ranks[row] += 1
+                    else:
+                        ranks[row] += 0
+
+        for row in base_rows:
+            # column in Y^D, row in X^B
+            k1 = next((k1 for k1 in matrix.free_rows if matrix.adj_b_inverse[k1][row] == 1), -1)
+            if k1 >= 0:
+                if matrix.adj_b_inv_adj[k1][row] == 1:
+                    s2 = column_is_in_matrix and any(k2 != k1 and matrix.adj_b_inv_adj[k2][row] != matrix.adj_b_inverse[k2][row] for k2 in matrix.free_rows)
+                else:
+                    s2 = column_is_in_matrix and any(k2 != k1 and matrix.adj_b_inv_adj[k2][row] == 1 for k2 in matrix.free_rows)
+                if s2:
+                    if t2:
+                        ranks[row] += 2
+                    else:
+                        ranks[row] += 1
+                else:
+                    if t2:
+                        ranks[row] += 1
+                    else:
+                        if column_is_in_matrix and matrix.adj_b_inv_adj[column][row] != (matrix.adj_b_inverse[column][row] & matrix.adj_b_inv_adj[k1][row]):
+                            ranks[row] += 1
+                        else:
+                            ranks[row] += 0
+            else:
+                s2 = column_is_in_matrix and any(matrix.adj_b_inv_adj[k2][row] == 1 for k2 in matrix.free_rows)
+                if matrix.adj_b_inverse[column][row] == 1:
+                    if s2:
+                        ranks[row] += 1
+                    else:
+                        ranks[row] += 0
+                else:
+                    if s2:
+                        if t2:
+                            ranks[row] += 1
+                        else:
+                            ranks[row] += 0
+                    else:
+                        if t2:
+                            ranks[row] += 0
+                        else:
+                            if column_is_in_matrix and matrix.adj_b_inv_adj[column][row] == 1:
+                                ranks[row] += 0
+                            else:
+                                ranks[row] += -1
+
+    else:
+
+        l1 = next((l1 for l1 in matrix.free_columns if matrix.b_inverse_adj[column][l1] == 1), -1)
+        if l1 >= 0 and matrix.adj_b_inv_adj[column][l1] == 1:
+            t2 = rows_are_in_matrix and any(l2 != l1 and matrix.adj_b_inv_adj[column][l2] != matrix.b_inverse_adj[column][l2] for l2 in matrix.free_columns)
+        else:
+            t2 = rows_are_in_matrix and any(l2 != l1 and matrix.adj_b_inv_adj[column][l2] == 1 for l2 in matrix.free_columns)
+        for row in free_rows:
+            # column in Y^B, row in X^D
+            if l1 >= 0:
+                s2 = any(k2 != row and matrix.adj_b_inv_adj[k2][row] == 1 for k2 in matrix.free_rows)
+                if t2:
+                    if s2:
+                        ranks[row] += 2
+                    else:
+                        ranks[row] += 1
+                else:
+                    if s2:
+                        ranks[row] += 1
+                    else:
+                        if rows_are_in_matrix and matrix.adj_b_inv_adj[column][row] != (matrix.b_inverse_adj[column][row] & matrix.adj_b_inv_adj[column][l1]):
+                            ranks[row] += 1
+                        else:
+                            ranks[row] += 0
+            else:
+                if matrix.b_inverse_adj[column][row] == 1:
+                    if t2:
+                        ranks[row] += 1
+                    else:
+                        ranks[row] += 0
+                else:
+                    s2 = any(k2 != row and matrix.adj_b_inv_adj[k2][row] == 1 for k2 in matrix.free_rows)
+                    if t2:
+                        if s2:
+                            ranks[row] += 1
+                        else:
+                            ranks[row] += 0
+                    else:
+                        if s2:
+                            ranks[row] += 0
+                        else:
+                            if rows_are_in_matrix and matrix.adj_b_inv_adj[column][row] == 1:
+                                ranks[row] += 0
+                            else:
+                                ranks[row] += -1
+        
+        q5_0 = any(matrix.adj_b_inv_adj[column][l] == 1 for l in matrix.free_columns)
+        q5_1 = any(matrix.adj_b_inv_adj[column][l] != matrix.b_inverse_adj[column][l] for l in matrix.free_columns)
+        for row in base_rows:
+            # column in Y^B, row in X^B
+            k1 = next((k1 for k1 in matrix.free_rows if matrix.adj_b_inverse[k1][row] == 1), -1)
+            if (matrix.base_inverse[column][row] == 1):
+
+                # Full rank matrix with row and column removed is invertible
+                if l1 >= 0 and k1 >= 0:
+                    if matrix.adj_b_inv_adj[k1][row] == 1:
+                        s2 = any(k2 != k1 and matrix.adj_b_inv_adj[k2][row] != matrix.adj_b_inverse[k2][row] for k2 in matrix.free_rows)
+                    else:
+                        s2 = any(k2 != k1 and matrix.adj_b_inv_adj[k2][row] == 1 for k2 in matrix.free_rows)
+                    if t2:
+                        if s2:
+                            ranks[row] += 2
+                        else:
+                            ranks[row] += 1
+                    else:
+                        if s2:
+                            ranks[row] += 1
+                        else:
+                            if ((matrix.adj_b_inv_adj[column][l1] & matrix.adj_b_inv_adj[k1][row]) ^ (matrix.adj_b_inv_adj[column][l1] & matrix.b_inverse_adj[column][row]) ^ (matrix.adj_b_inv_adj[k1][row] & matrix.adj_b_inverse[column][row])) != matrix.adj_b_inv_adj[column][row]:
+                                ranks[row] += 1
+                            else:
+                                ranks[row] += 0
+
+                else:
+                    q5 = q5_1 if matrix.adj_b_inverse[column][row] == 1 else q5_0
+                    q4 = any(matrix.adj_b_inv_adj[k][row] != (matrix.b_inverse_adj[column][row] & matrix.adj_b_inverse[k][row]) for k in matrix.free_rows)
+                    if q5:
+                        if q4:
+                            ranks[row] += 1
+                        else:
+                            ranks[row] += 0
+                    else:
+                        if q4:
+                            ranks[row] += 0
+                        else:
+                            if matrix.adj_b_inv_adj[column][row] != (matrix.adj_b_inverse[column][row] & matrix.b_inverse_adj[column][row]):
+                                ranks[row] += 0
+                            else:
+                                ranks[row] += -1
+
+            else:
+
+                # Full rank matrix with row and column removed is singular
+                if l1 >= 0:
+
+                    if k1 >= 0:
+
+                        # Case l1 >= 0 and k1 >= 0
+                        if matrix.adj_b_inv_adj[k1][row] == 1:
+                            s2 = any(k2 != k1 and matrix.adj_b_inv_adj[k2][row] != matrix.adj_b_inverse[k2][row] for k2 in matrix.free_rows)
+                        else:
+                            s2 = any(k2 != k1 and matrix.adj_b_inv_adj[k2][row] == 1 for k2 in matrix.free_rows)
+                        if t2:
+                            if s2:
+                                ranks[row] += 2
+                            else:
+                                ranks[row] += 1
+                        else:
+                            if s2:
+                                ranks[row] += 1
+                            else:
+                                if ((matrix.adj_b_inv_adj[column][l1] & matrix.b_inverse_adj[column][row]) ^ (matrix.adj_b_inv_adj[k1][row] & matrix.adj_b_inverse[column][row])) != matrix.adj_b_inv_adj[column][row]:
+                                    ranks[row] += 1
+                                else:
+                                    ranks[row] += 0
+
+                    else:
+
+                        # Case l1 >= 0 and k1 < 0
+                        s2 = any(matrix.adj_b_inv_adj[k2][row] == 1 for k2 in matrix.free_rows)
+                        if s2:
+                            if matrix.adj_b_inverse[column][row] == 1:
+                                ranks[row] += 1
+                            else:
+                                if t2:
+                                    ranks[row] += 1
+                                else:
+                                    ranks[row] += 0
+                        else:
+                            if matrix.adj_b_inverse[column][row] == 1:
+                                ranks[row] += 0
+                            else:
+                                if t2:
+                                    ranks[row] += 0
+                                else:
+                                    if (matrix.adj_b_inv_adj[column][l1] & matrix.b_inverse_adj[column][row]) != matrix.adj_b_inv_adj[column][row]:
+                                        ranks[row] += 0
+                                    else:
+                                        ranks[row] += -1
+
+                else:
+
+                    if k1 >= 0:
+
+                        # Case l1 < 0 and k1 >= 0
+                        if t2:
+                            if matrix.b_inverse_adj[column][row] == 1:
+                                ranks[row] += 1
+                            else:
+                                if matrix.adj_b_inv_adj[k1][row] == 1:
+                                    s2 = any(k2 != k1 and matrix.adj_b_inv_adj[k2][row] != matrix.adj_b_inverse[k2][row] for k2 in matrix.free_rows)
+                                else:
+                                    s2 = any(k2 != k1 and matrix.adj_b_inv_adj[k2][row] == 1 for k2 in matrix.free_rows)
+                                if s2:
+                                    ranks[row] += 1
+                                else:
+                                    ranks[row] += 0
+                        else:
+                            if matrix.b_inverse_adj[column][row] == 1:
+                                ranks[row] += 0
+                            else:
+                                if matrix.adj_b_inv_adj[k1][row] == 1:
+                                    s2 = any(k2 != k1 and matrix.adj_b_inv_adj[k2][row] != matrix.adj_b_inverse[k2][row] for k2 in matrix.free_rows)
+                                else:
+                                    s2 = any(k2 != k1 and matrix.adj_b_inv_adj[k2][row] == 1 for k2 in matrix.free_rows)
+                                if s2:
+                                    ranks[row] += 0
+                                else:
+                                    if (matrix.adj_b_inv_adj[k1][row] & matrix.adj_b_inverse[column][row]) != matrix.adj_b_inv_adj[column][row]:
+                                        ranks[row] += 0
+                                    else:
+                                        ranks[row] += -1
+
+                    else:
+
+                        # Case l1 < 0 and k1 < 0
+                        if matrix.b_inverse_adj[column][row] == 1:
+                            if matrix.adj_b_inverse[column][row] == 1:
+                                ranks[row] += 0
+                            else:
+                                if t2:
+                                    ranks[row] += 0
+                                else:
+                                    ranks[row] += -1
+                        else:
+                            if matrix.adj_b_inverse[column][row] == 1:
+                                s2 = any(matrix.adj_b_inv_adj[k2][row] == 1 for k2 in matrix.free_rows)
+                                if s2:
+                                    ranks[row] += 0
+                                else:
+                                    ranks[row] += -1
+                            else:
+                                s2 = any(matrix.adj_b_inv_adj[k2][row] == 1 for k2 in matrix.free_rows)
+                                if t2:
+                                    if s2:
+                                        ranks[row] += 0
+                                    else:
+                                        ranks[row] += -1
+                                else:
+                                    if s2:
+                                        ranks[row] += -1
+                                    else:
+                                        if matrix.adj_b_inv_adj[column][row] == 1:
+                                            ranks[row] += -1
+                                        else:
+                                            ranks[row] += -2
 
 
 def add_row_swap_cut_rank_deltas(matrix : SubMatrix, row : int, columns_to_swap : list[int], row_is_in_matrix: bool, columns_are_in_matrix: bool, ranks : list[int]) -> None:

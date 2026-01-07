@@ -5,7 +5,7 @@ import random
 from min_cutrank.graph import Graph, set_edge
 from min_cutrank.graph_partition import GraphPartition, SubMatrix
 from min_cutrank.matrix_tools import create_zero_matrix, copy_matrix, rank_matrix_positions, set_common_matrix_value, insert_zero_matrix, add_matrix, add_product_matrix, is_zero_matrix, is_identity_matrix
-from min_cutrank.swap_rank_calculator import all_swap_cut_ranks, row_swap_cut_ranks, single_swap_cut_rank_delta
+from min_cutrank.swap_rank_calculator import all_swap_cut_ranks, one_to_many_swap_cut_ranks, single_swap_cut_rank_delta
 
 
 def parse_int(value: str, default: int) -> int:
@@ -147,7 +147,7 @@ class FormulaRankCollector(RankCollector):
                     cut_ranks[node1][node2] = old_rank + single_swap_cut_rank_delta(self.partition, node1, node2)
         elif self.row_ranks:
             for node1 in nodes_to_swap1:
-                row_swap_cut_ranks(self.partition, node1, nodes_to_swap2, cut_ranks[node1])
+                one_to_many_swap_cut_ranks(self.partition, node1, nodes_to_swap2, cut_ranks[node1])
         else:
             all_swap_cut_ranks(self.partition, nodes_to_swap1, nodes_to_swap2, cut_ranks)
 
@@ -212,12 +212,13 @@ class ApplySwapRankCollector(RankCollector):
 
         for i, subset1 in enumerate(p.subsets):
             for j, subset2 in enumerate(p.subsets):
-                if i == j:
-                    continue
-
                 matrix = p.matrices[i][j]
-                if matrix.rows != subset1 or matrix.columns != subset2:
-                    raise Exception("Submatrix rows or columns inconsistent with subsets")
+                if i < j:
+                    if matrix.rows != subset1 or matrix.columns != subset2:
+                        raise Exception("Submatrix rows or columns inconsistent with subsets")
+                else:
+                    if matrix is not None:
+                        raise Exception("Unexpected submatrix")
 
         for list in p.matrices:
             for m in list:

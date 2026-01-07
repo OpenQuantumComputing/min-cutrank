@@ -1,33 +1,48 @@
 from min_cutrank.graph_partition import GraphPartition, SubMatrix
 
 
-def all_swap_cut_ranks(partition : GraphPartition, rows_to_swap: list[int], columns_to_swap: list[int], ranks : list[list[int]]) -> None:
-    """Finds the cut-ranks for the partitions obtained by swapping any of the given rows with any of the given columns in the given graph partition.
+def all_swap_cut_ranks(partition : GraphPartition, nodes1: list[int], nodes2: list[int], ranks : list[list[int]]) -> None:
+    """Finds the cut-ranks for the partitions obtained by swapping any pair of nodes between the given sets in the given graph partition.
     
     args:
         - partition: 'GraphPartition' The graph partition.
-        - rows_to_swap: 'list[int]' The rows to be swapped.
-        - columns_to_swap: 'list[int]' The columns to be swapped.
+        - nodes1: 'list[int]' The first set of nodes to be swapped.
+        - nodes2: 'list[int]' The second set of nodes to be swapped.
         - ranks: 'list[list[int]]' A matrix where position [i][j] will hold the cut-rank after swapping node i and j. 
-            Only positions where i is in rows_to_swap and j is in columns_to_swap will be affected.
+            Only positions where i is in nodes1 and j is in nodes2 will be affected.
     """
     
-    row_subset_index = single([partition.subset_index[row] for row in rows_to_swap], "All rows to swap must be in the same subset or not in any subset")
-    column_subset_index = single([partition.subset_index[column] for column in columns_to_swap], "All columns to swap must be in the same subset or not in any subset")
-    if (row_subset_index == column_subset_index):
-        raise Exception("Rows and columns to swap cannot be in the same subset")
+    subset_index1 = single([partition.subset_index[n] for n in nodes1], "nodes1 must be contained in a single partition subset or not in any subset")
+    subset_index2 = single([partition.subset_index[n] for n in nodes2], "nodes2 must be contained in a single partition subset or not in any subset")
+    if (subset_index1 == subset_index2):
+        raise Exception("nodes1 and nodes2 cannot be in the same partition subset")
 
     # Initialize ranks
-    for row in rows_to_swap:
-        for column in columns_to_swap:
-            ranks[row][column] = partition.cut_rank
+    for node1 in nodes1:
+        for node2 in nodes2:
+            ranks[node1][node2] = partition.cut_rank
+            if ranks[node2][node1] != -1:
+                raise Exception("Ranks matrix is not properly initialized")
+            ranks[node2][node1] = 0
 
     # Add contributions from each sub-matrix
     for i in range(len(partition.subsets)):
-        if i != row_subset_index and row_subset_index != -1:
-            add_all_swap_cut_rank_deltas(partition.matrices[row_subset_index][i], rows_to_swap, columns_to_swap, True, i == column_subset_index, ranks)
-        if i != column_subset_index and i != row_subset_index and column_subset_index != -1:
-            add_all_swap_cut_rank_deltas(partition.matrices[i][column_subset_index], rows_to_swap, columns_to_swap, False, True, ranks)
+        if subset_index1 != -1:
+            if i < subset_index1:
+                add_all_swap_cut_rank_deltas(partition.matrices[i][subset_index1], nodes2, nodes1, i == subset_index2, True, ranks)
+            elif subset_index1 < i:
+                add_all_swap_cut_rank_deltas(partition.matrices[subset_index1][i], nodes1, nodes2, True, i == subset_index2, ranks)
+        if i != subset_index1 and subset_index2 != -1:
+            if i < subset_index2:
+                add_all_swap_cut_rank_deltas(partition.matrices[i][subset_index2], nodes1, nodes2, False, True, ranks)
+            elif subset_index2 < i:
+                add_all_swap_cut_rank_deltas(partition.matrices[subset_index2][i], nodes2, nodes1, True, False, ranks)
+
+    # Collect ranks (necessary because we swap nodes1 and nodes2 in some calls above)
+    for node1 in nodes1:
+        for node2 in nodes2:
+            ranks[node1][node2] += ranks[node2][node1]
+            ranks[node2][node1] = -1
 
 
 def add_all_swap_cut_rank_deltas(matrix : SubMatrix, rows_to_swap: list[int], columns_to_swap: list[int], rows_are_in_matrix: bool, columns_are_in_matrix: bool, ranks : list[list[int]]) -> None:
@@ -326,34 +341,38 @@ def add_all_swap_cut_rank_deltas(matrix : SubMatrix, rows_to_swap: list[int], co
                                                 ranks[i][j] += -2
 
 
-def row_swap_cut_ranks(partition : GraphPartition, row : int, columns_to_swap : list[int], ranks : list[int]) -> None:
-    """Finds the cut-ranks for the partitions obtained by swapping the given row with any of the given columns in the given graph partition.
+def one_to_many_swap_cut_ranks(partition : GraphPartition, node : int, nodes_to_swap : list[int], ranks : list[int]) -> None:
+    """Finds the cut-ranks for the partitions obtained by swapping the node with any of nodes_to_swap in the given graph partition.
     
     args:
         - partition: 'GraphPartition' The graph partition.
-        - row: 'int' The row to be swapped.
-        - columns_to_swap: 'list[int]' The columns to be swapped.
-        - ranks: 'list[int]' A list where position [j] represents the cut-rank after swapping 'row' and 'j'. 
-            Only positions where j is among columns_to_swap will be affected.
+        - node: 'int' The node to be swapped.
+        - nodes_to_swap: 'list[int]' The nodes to be swapped with.
+        - ranks: 'list[int]' A list where position [i] represents the cut-rank after swapping 'node' and 'i'. 
+            Only positions where i is among nodes_to_swap will be affected.
     """
 
-    row_subset_index = partition.subset_index[row]
-    column_subset_index = single([partition.subset_index[column] for column in columns_to_swap], "All columns to swap must be in the same subset or not in any subset")
-    if (row_subset_index == column_subset_index):
-        raise Exception("Row and columns to swap cannot be in the same subset")
+    subset_index1 = partition.subset_index[node]
+    subset_index2 = single([partition.subset_index[column] for column in nodes_to_swap], "nodes_to_swap with must be contained in a single partition subset or not in any subset")
+    if (subset_index1 == subset_index2):
+        raise Exception("node and nodes_to_swap cannot be in the same subset")
 
     # Initialize ranks
-    for column in columns_to_swap:
-        ranks[column] = partition.cut_rank
+    for node2 in nodes_to_swap:
+        ranks[node2] = partition.cut_rank
 
     # Add contributions from each sub-matrix
     for i in range(len(partition.subsets)):
-        if i != row_subset_index and row_subset_index != -1:
-            add_row_swap_cut_rank_deltas(partition.matrices[row_subset_index][i], row, columns_to_swap, True, i == column_subset_index, ranks)
-            #add_col_swap_cut_rank_deltas(partition.matrices[i][row_subset_index], columns_to_swap, row, i == column_subset_index, True, ranks)
-        if i != column_subset_index and i != row_subset_index and column_subset_index != -1:
-            add_row_swap_cut_rank_deltas(partition.matrices[i][column_subset_index], row, columns_to_swap, False, True, ranks)
-            #add_col_swap_cut_rank_deltas(partition.matrices[column_subset_index][i], columns_to_swap, row, True, False, ranks)
+        if subset_index1 != -1:
+            if i < subset_index1:
+                add_col_swap_cut_rank_deltas(partition.matrices[i][subset_index1], nodes_to_swap, node, i == subset_index2, True, ranks)
+            elif subset_index1 < i:
+                add_row_swap_cut_rank_deltas(partition.matrices[subset_index1][i], node, nodes_to_swap, True, i == subset_index2, ranks)
+        if i != subset_index1 and subset_index2 != -1:
+            if i < subset_index2:
+                add_row_swap_cut_rank_deltas(partition.matrices[i][subset_index2], node, nodes_to_swap, False, True, ranks)
+            elif subset_index2 < i:
+                add_col_swap_cut_rank_deltas(partition.matrices[subset_index2][i], nodes_to_swap, node, True, False, ranks)
 
 
 def add_col_swap_cut_rank_deltas(matrix : SubMatrix, rows_to_swap : list[int], column : int, rows_are_in_matrix: bool, column_is_in_matrix: bool, ranks : list[int]) -> None:
@@ -934,29 +953,35 @@ def add_row_swap_cut_rank_deltas(matrix : SubMatrix, row : int, columns_to_swap 
                                             ranks[column] += -2
 
 
-def single_swap_cut_rank_delta(partition : GraphPartition, row : int, column : int) -> int:
-    """Returns the change in cut-rank for the partition obtained by swapping the given row and column in the given graph partition.
+def single_swap_cut_rank_delta(partition : GraphPartition, node1 : int, node2 : int) -> int:
+    """Returns the change in cut-rank for the partition obtained by swapping the given nodes in the given graph partition.
     
     args:
         - partition: 'GraphPartition' The graph partition.
-        - row: 'int' The row to be swapped.
-        - column: 'int' The column to be swapped.
+        - node1: 'int' The first node to be swapped.
+        - node2: 'int' The second node to be swapped.
     """
 
-    row_subset_index = partition.subset_index[row]
-    column_subset_index = partition.subset_index[column]
-    if (row_subset_index == column_subset_index):
-        raise Exception("Rows and columns to swap cannot be in the same subset")
+    subset_index1 = partition.subset_index[node1]
+    subset_index2 = partition.subset_index[node2]
+    if (subset_index1 == subset_index2):
+        raise Exception("Nodes to swap cannot be in the same subset")
 
     # Initialize rank delta
     rank_delta = 0
 
     # Add contributions from each sub-matrix
     for i in range(len(partition.subsets)):
-        if i != row_subset_index and row_subset_index != -1:
-            rank_delta += single_swap_rank_delta(partition.matrices[row_subset_index][i], row, column, True, i == column_subset_index)
-        if i != column_subset_index and i != row_subset_index and column_subset_index != -1:
-            rank_delta += single_swap_rank_delta(partition.matrices[i][column_subset_index], row, column, False, True)
+        if subset_index1 != -1:
+            if i < subset_index1:
+                rank_delta += single_swap_rank_delta(partition.matrices[i][subset_index1], node2, node1, i == subset_index2, True)
+            elif subset_index1 < i:
+                rank_delta += single_swap_rank_delta(partition.matrices[subset_index1][i], node1, node2, True, i == subset_index2)
+        if i != subset_index1 and subset_index2 != -1:
+            if i < subset_index2:
+                rank_delta += single_swap_rank_delta(partition.matrices[i][subset_index2], node1, node2, False, True)
+            elif subset_index2 < i:
+                rank_delta += single_swap_rank_delta(partition.matrices[subset_index2][i], node2, node1, True, False)
 
     return rank_delta
 

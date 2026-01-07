@@ -20,11 +20,11 @@ class GraphPartition:
     subset_index: list[int]
     """For each node in the graph, the index of the subset it belongs to, or -1 if it is not in any subset."""
 
-    matrices: list[list['SubMatrix']]
-    """matrices[i][j] is the SubMatrix whose rows are subsets[i] and whose columns are subsets[j]."""
+    matrices: list[list[SubMatrix]]
+    """matrices[i][j] where i < j is the SubMatrix whose rows are subsets[i] and whose columns are subsets[j]."""
 
-    matrix_list: list['SubMatrix']
-    """A flat list of all SubMatrix objects in this partition, excluding mirror symmetries."""
+    matrix_list: list[SubMatrix]
+    """A flat list of all SubMatrix objects in this partition"""
 
     buffer : list[list[int]]
     """A square nmb_nodes x nmb_nodes used for caching intermediate calculations when updating the variables after the partition has been changed."""
@@ -43,7 +43,7 @@ class GraphPartition:
             for node in subset:
                 self.subset_index[node] = i
 
-        self.matrices = [[SubMatrix(self, s, t) if s !=t else None for t in self.subsets] for s in self.subsets]
+        self.matrices = [[SubMatrix(self, s, t) if i < j else None for j, t in enumerate(self.subsets)] for i, s in enumerate(self.subsets)]
         self.matrix_list = [m for i, line in enumerate(self.matrices) for m in line[i+1:]]
         self.cut_rank = sum(m.rank for m in self.matrix_list)
         self.buffer = self._empty_matrix()
@@ -60,11 +60,10 @@ class GraphPartition:
         self.cut_rank = other.cut_rank
         self.subset_index[:] = other.subset_index[:]
 
-        for i in range(len(self.subsets)):
-            self.subsets[i][:] = other.subsets[i][:]
-            for j in range(len(self.subsets)):
-                if i != j:
-                    self.matrices[i][j].copy(other.matrices[i][j])
+        for j in range(len(self.subsets)):
+            self.subsets[j][:] = other.subsets[j][:]
+            for i in range(0, j):
+                self.matrices[i][j].copy(other.matrices[i][j])
 
     def fromFlags(graph: Graph, subset1_flags : list[bool], subset2_flags : list[bool] = None) -> 'GraphPartition':
         """Creates a GraphPartition with two subsets, from flags for which nodes belong to the subsets.
@@ -100,12 +99,16 @@ class GraphPartition:
         subset2_index = self.subset_index[node2]
 
         for i in range(len(self.subsets)):
-            if i != subset1_index and subset1_index != -1:
-                self.cut_rank += self.matrices[subset1_index][i].apply_swap(node1, node2, True, i == subset2_index)
-                self.matrices[i][subset1_index].apply_swap(node2, node1, i == subset2_index, True)
-            if i != subset2_index and i != subset1_index and subset2_index != -1:
-                self.cut_rank += self.matrices[i][subset2_index].apply_swap(node1, node2, False, True)
-                self.matrices[subset2_index][i].apply_swap(node2, node1, True, False)
+            if subset1_index != -1:
+                if i < subset1_index:
+                    self.cut_rank += self.matrices[i][subset1_index].apply_swap(node2, node1, i == subset2_index, True)
+                elif subset1_index < i:
+                    self.cut_rank += self.matrices[subset1_index][i].apply_swap(node1, node2, True, i == subset2_index)
+            if i != subset1_index and subset2_index != -1:
+                if i < subset2_index:
+                    self.cut_rank += self.matrices[i][subset2_index].apply_swap(node1, node2, False, True)
+                elif subset2_index < i:
+                    self.cut_rank += self.matrices[subset2_index][i].apply_swap(node2, node1, True, False)
 
         if subset1_index != -1:
             subset1 = self.subsets[subset1_index]

@@ -2,7 +2,7 @@ import sys
 import getopt
 import random
 from min_cutrank.test_tools import parse_int, parse_float, graph_from_description, run_greedy_min_rank
-from min_cutrank.partition_builder import random_partition
+from min_cutrank.partition_builder import random_bipartition
 
 def run_greedy(opt_arguments: list[str]) -> None:
     """
@@ -55,7 +55,7 @@ def run_greedy(opt_arguments: list[str]) -> None:
             if seed != None:
                 random.seed(seed)
             graph_adj_matrix = graph_from_description(graph_setup)
-            graph_partition = random_partition(graph_adj_matrix, set_portion)
+            graph_partition = random_bipartition(graph_adj_matrix, set_portion)
 
             run_greedy_min_rank(graph_partition, rank_calculation_methods)
 

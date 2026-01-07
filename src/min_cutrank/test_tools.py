@@ -83,7 +83,7 @@ class RankCollector(ABC):
     partition : GraphPartition
 
     @abstractmethod
-    def collect_ranks(self, cut_ranks : list[list[int]], rows_to_swap: list[int], columns_to_swap: list[int]) -> None:
+    def collect_ranks(self, cut_ranks : list[list[int]], nodes_to_swap1: list[int], nodes_to_swap2: list[int]) -> None:
         pass
     @abstractmethod
     def name(self) -> str:
@@ -105,17 +105,21 @@ class DirectSwapRankCollector(RankCollector):
         self.partition = partition
         self.buffer = create_zero_matrix(partition.graph.nmb_nodes, partition.graph.nmb_nodes)
 
-    def collect_ranks(self, cut_ranks : list[list[int]], rows_to_swap: list[int], columns_to_swap: list[int]) -> None:
-        rows_copy, cols_copy = self.partition.rows_and_columns_copy()
-        for row in rows_to_swap:
-            for col in columns_to_swap:
-                swap(rows_copy, row, col)
-                swap(cols_copy, row, col)
-                copy_matrix(self.partition.graph.adjacencies, self.buffer, rows_copy, cols_copy)
-                base_rows, _ = rank_matrix_positions(self.buffer, rows_copy, cols_copy)
-                cut_ranks[row][col] = len(base_rows)
-                swap(rows_copy, row, col)
-                swap(cols_copy, row, col)
+    def collect_ranks(self, cut_ranks : list[list[int]], nodes_to_swap1: list[int], nodes_to_swap2: list[int]) -> None:
+        subsets_copy = [s[:] for s in self.partition.subsets]
+        for node1 in nodes_to_swap1:
+            for node2 in nodes_to_swap2:
+                cut_ranks[node1][node2] = 0
+                for i, rows in enumerate(subsets_copy):
+                    for j in range(i):
+                        cols = subsets_copy[j]
+                        swap(rows, node1, node2)
+                        swap(cols, node1, node2)
+                        copy_matrix(self.partition.graph.adjacencies, self.buffer, rows, cols)
+                        base_rows, _ = rank_matrix_positions(self.buffer, rows, cols)
+                        cut_ranks[node1][node2] += len(base_rows)
+                        swap(rows, node1, node2)
+                        swap(cols, node1, node2)
 
     def name(self) -> str:
         return "Gauss-Jordan elimination rank calculation"
@@ -133,19 +137,19 @@ class FormulaRankCollector(RankCollector):
         self.row_ranks = row_ranks and not single_ranks
         self.call_count = 0
 
-    def collect_ranks(self, cut_ranks : list[list[int]], rows_to_swap: list[int], columns_to_swap: list[int]) -> None:
+    def collect_ranks(self, cut_ranks : list[list[int]], nodes_to_swap1: list[int], nodes_to_swap2: list[int]) -> None:
         
         old_rank = self.partition.cut_rank
         
         if self.single_ranks:
-            for row in rows_to_swap:
-                for col in columns_to_swap:
-                    cut_ranks[row][col] = old_rank + single_swap_cut_rank_delta(self.partition, row, col)
+            for node1 in nodes_to_swap1:
+                for node2 in nodes_to_swap2:
+                    cut_ranks[node1][node2] = old_rank + single_swap_cut_rank_delta(self.partition, node1, node2)
         elif self.row_ranks:
-            for row in rows_to_swap:
-                row_swap_cut_ranks(self.partition, row, columns_to_swap, cut_ranks[row])
+            for node1 in nodes_to_swap1:
+                row_swap_cut_ranks(self.partition, node1, nodes_to_swap2, cut_ranks[node1])
         else:
-            all_swap_cut_ranks(self.partition, rows_to_swap, columns_to_swap, cut_ranks)
+            all_swap_cut_ranks(self.partition, nodes_to_swap1, nodes_to_swap2, cut_ranks)
 
     def name(self) -> str:
         return "Single ranks by formulas" if self.single_ranks else ("Row ranks by formulas" if self.row_ranks else "All ranks by formulas")
@@ -182,12 +186,12 @@ class ApplySwapRankCollector(RankCollector):
         self.validate = validate
         self.buffer_flag = [False] * partition.graph.nmb_nodes
 
-    def collect_ranks(self, cut_ranks : list[list[int]], rows_to_swap: list[int], columns_to_swap: list[int]) -> None:
+    def collect_ranks(self, cut_ranks : list[list[int]], nodes_to_swap1: list[int], nodes_to_swap2: list[int]) -> None:
         self.backup.copy(self.partition)
-        for row in rows_to_swap:
-            for col in columns_to_swap:
-                self.partition.apply_swap(row, col)
-                cut_ranks[row][col] = self.partition.cut_rank
+        for node1 in nodes_to_swap1:
+            for node2 in nodes_to_swap2:
+                self.partition.apply_swap(node1, node2)
+                cut_ranks[node1][node2] = self.partition.cut_rank
                 if self.validate:
                     self._validate_partition()
                 self.partition.copy(self.backup)
@@ -315,11 +319,11 @@ class CutRankCalculatorComparer:
     partition : GraphPartition
     """The partition for which to calculate cut rank deltas."""
 
-    rows: list[int]
-    """The rows to calculate for."""
+    nodes1: list[int]
+    """The first subset of nodes to calculate for."""
 
-    columns: list[int]
-    """The columns to calculate for."""
+    nodes2: list[int]
+    """The second subset of nodes to calculate for."""
 
     first_cut_ranks : list[list[int]]
     """The cut-ranks calculated in the first calculation pass."""
@@ -334,10 +338,10 @@ class CutRankCalculatorComparer:
         self.first_cut_ranks = create_zero_matrix(partition.graph.nmb_nodes, partition.graph.nmb_nodes)
         self.second_cut_ranks = create_zero_matrix(partition.graph.nmb_nodes, partition.graph.nmb_nodes)
 
-    def reset(self, rows: list[int], columns: list[int]) -> None:
+    def reset(self, nodes1: list[int], nodes2: list[int]) -> None:
         self.first_calculations_name = None
-        self.rows = rows
-        self.columns = columns
+        self.nodes1 = nodes1
+        self.nodes2 = nodes2
 
     def is_reset(self) -> bool:
         return self.first_calculations_name == None
@@ -350,12 +354,12 @@ class CutRankCalculatorComparer:
             set_common_matrix_value(-1, self.first_cut_ranks, self.partition.graph.nodes, self.partition.graph.nodes)
             self.first_calculations_name = name
             start = time.time()
-            collector.collect_ranks(self.first_cut_ranks, self.rows, self.columns)
+            collector.collect_ranks(self.first_cut_ranks, self.nodes1, self.nodes2)
             end = time.time()
         else:
             set_common_matrix_value(-1, self.second_cut_ranks, self.partition.graph.nodes, self.partition.graph.nodes)
             start = time.time()
-            collector.collect_ranks(self.second_cut_ranks, self.rows, self.columns)
+            collector.collect_ranks(self.second_cut_ranks, self.nodes1, self.nodes2)
             end = time.time()
 
         if log:
@@ -363,28 +367,31 @@ class CutRankCalculatorComparer:
 
         if is_first:
             p_rank = self.partition.cut_rank
-            max_rank = min(len(subset) for subset in self.partition.subsets)
-            for row in self.rows:
-                for col in self.columns:
-                    rank = self.first_cut_ranks[row][col]
+            max_rank = sum(min(len(m.rows), len(m.columns)) for m in self.partition.matrix_list)
+            # The rank of the matrix containing the row and column can change by up to 2.
+            # Each of the other 2*(n-2) matrices that contain either the row or the column can change rank by up to 1.
+            max_change = 2 + 2 * (len(self.partition.subsets) - 2)
+            for node1 in self.nodes1:
+                for node2 in self.nodes2:
+                    rank = self.first_cut_ranks[node1][node2]
                     if rank < 0 or rank > max_rank:
-                        print(f"Cut-rank for position ({row},{col}) is {rank}, outside allowed range of [0,{max_rank}]")
+                        print(f"Cut-rank for position ({node1},{node2}) is {rank}, outside allowed range of [0,{max_rank}]")
                         raise Exception("Cut-rank outside allowed range")
-                    if rank < p_rank - 2 or rank > p_rank + 2:
-                        print(f"Cut-rank for position ({row},{col}) is {rank}, too far from current cut-rank {p_rank}")
+                    if rank < p_rank - max_change or rank > p_rank + max_change:
+                        print(f"Cut-rank for position ({node1},{node2}) is {rank}, too far from current cut-rank {p_rank}")
                         raise Exception("New cut-rank too far from current cut-rank")
-                for col in self.rows:
-                    if self.first_cut_ranks[row][col] != -1:
-                        print(f"Cut-rank for position ({row},{col}) is {rank}, should be -1 since {col} is not a column position")
+                for node2 in self.nodes1:
+                    if self.first_cut_ranks[node1][node2] != -1:
+                        print(f"Cut-rank for position ({node1},{node2}) is {rank}, should be -1 since {node2} is not a column position")
                         raise Exception("Cut-rank set outside Rows x Columns")
-            for row in self.columns:
-                for col in self.columns:
-                    if self.first_cut_ranks[row][col] != -1:
-                        print(f"Cut-rank for position ({row},{col}) is {rank}, should be -1 since {row} is not a row position")
+            for node1 in self.nodes2:
+                for node2 in self.nodes2:
+                    if self.first_cut_ranks[node1][node2] != -1:
+                        print(f"Cut-rank for position ({node1},{node2}) is {rank}, should be -1 since {node1} is not a row position")
                         raise Exception("Cut-rank set outside Rows x Columns")
-                for col in self.rows:
-                    if self.first_cut_ranks[row][col] != -1:
-                        print(f"Cut-rank for position ({row},{col}) is {rank}, should be -1 since {row} is not a row position and {col} is not a column position")
+                for node2 in self.nodes1:
+                    if self.first_cut_ranks[node1][node2] != -1:
+                        print(f"Cut-rank for position ({node1},{node2}) is {rank}, should be -1 since {node1} is not a row position and {node2} is not a column position")
                         raise Exception("Cut-rank set outside Rows x Columns")
         else:
             for i in self.partition.graph.nodes:

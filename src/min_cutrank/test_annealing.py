@@ -5,7 +5,7 @@ import getopt
 import random
 from min_cutrank.cut_rank_annealing import cut_rank_annealing_direct, cut_rank_annealing_row_formula
 from min_cutrank.test_tools import parse_bool,parse_int, parse_float, graph_from_description, temperatures_from_description
-from min_cutrank.partition_builder import random_partition
+from min_cutrank.partition_builder import random_bipartition
 
 
 def test_annealing_method(annealing_method, name : str, partition, temperatures, log : bool) -> None:
@@ -72,7 +72,7 @@ def run_annealing(opt_arguments: list[str]) -> None:
             if seed != None:
                 random.seed(seed)
             graph_adj_matrix = graph_from_description(graph_setup)
-            graph_partition = random_partition(graph_adj_matrix, set_portion)
+            graph_partition = random_bipartition(graph_adj_matrix, set_portion)
 
             seed_algo = random.randint(0, 65535)
             if cut_rank_methods == []:

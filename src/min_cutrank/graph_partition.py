@@ -23,12 +23,17 @@ class GraphPartition:
     matrices: list[list['SubMatrix']]
     """matrices[i][j] is the SubMatrix whose rows are subsets[i] and whose columns are subsets[j]."""
 
+    matrix_list: list['SubMatrix']
+    """A flat list of all SubMatrix objects in this partition, excluding mirror symmetries."""
+
     buffer : list[list[int]]
     """A square nmb_nodes x nmb_nodes used for caching intermediate calculations when updating the variables after the partition has been changed."""
 
     def __init__(self, graph: Graph, subsets : list[list[int]]):
-        if subsets is None or len(subsets) != 2:
-            raise Exception("GraphPartition currently only supports two subsets")
+        if subsets is None or len(subsets) < 2:
+            raise Exception("GraphPartition must have at least two subsets")
+        if len(set(node for subset in subsets for node in subset)) < sum(len(subset) for subset in subsets):
+            raise Exception("Subsets in GraphPartition must be disjoint")
 
         self.graph = graph
         self.subsets = [subset[:] for subset in subsets]
@@ -39,7 +44,8 @@ class GraphPartition:
                 self.subset_index[node] = i
 
         self.matrices = [[SubMatrix(self, s, t) if s !=t else None for t in self.subsets] for s in self.subsets]
-        self.cut_rank = self.matrices[0][1].rank
+        self.matrix_list = [m for i, line in enumerate(self.matrices) for m in line[i+1:]]
+        self.cut_rank = sum(m.rank for m in self.matrix_list)
         self.buffer = self._empty_matrix()
 
     def clone(self) -> 'GraphPartition':
@@ -60,23 +66,25 @@ class GraphPartition:
                 if i != j:
                     self.matrices[i][j].copy(other.matrices[i][j])
 
-    def fromFlags(graph: Graph, row_flags : list[bool], column_flags : list[bool] = None) -> 'GraphPartition':
-        """Creates a GraphPartition from flags for which nodes belong to the rows and columns.
-        If the column_flags is not given, it is assumed to be the negation of the row_flags.
+    def fromFlags(graph: Graph, subset1_flags : list[bool], subset2_flags : list[bool] = None) -> 'GraphPartition':
+        """Creates a GraphPartition with two subsets, from flags for which nodes belong to the subsets.
+        If the subset2_flags is not given, it is assumed to be the negation of the subset1_flags.
         """
-        column_flags = column_flags if column_flags is not None else [not flag for flag in row_flags]
+        subset2_flags = subset2_flags if subset2_flags is not None else [not flag for flag in subset1_flags]
 
-        rows = [n for n in graph.nodes if row_flags[n]]
-        columns = [n for n in graph.nodes if column_flags[n]]
+        subset1 = [n for n in graph.nodes if subset1_flags[n]]
+        subset2 = [n for n in graph.nodes if subset2_flags[n]]
 
-        return GraphPartition(graph, [rows, columns])
+        return GraphPartition(graph, [subset1, subset2])
 
     def _empty_matrix(self) -> list[list[int]]:
 
         return create_zero_matrix(self.graph.nmb_nodes, self.graph.nmb_nodes)
 
     def rows_and_columns_copy(self) -> tuple[list[int], list[int]]:
-        """Returns a copy of the rows and columns of this partition."""
+        """Returns a copy of the rows and columns of this partition.
+        This makes sense only for bipartitions, where the rows are the first subset and the columns the second subset.
+        """
         if self.subsets is None or len(self.subsets) != 2:
             raise Exception("Partition does not have exactly two subsets")
         return self.subsets[0][:], self.subsets[1][:]

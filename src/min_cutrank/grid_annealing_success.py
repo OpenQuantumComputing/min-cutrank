@@ -5,7 +5,7 @@ import random
 import time
 from min_cutrank.graph import Graph
 from min_cutrank.test_tools import parse_int, parse_float, temperatures_from_description
-from min_cutrank.partition_builder import random_partition
+from min_cutrank.partition_builder import random_bipartition
 from min_cutrank.cut_rank_annealing import cut_rank_annealing_row_formula
 
 
@@ -91,7 +91,7 @@ def grid_annealing_success(opt_arguments: list[str]) -> None:
                     start_time = time.time()
 
                     for _ in range(samples):
-                        partition = random_partition(adj_mat, set_portion)
+                        partition = random_bipartition(adj_mat, set_portion)
                         cut_rank_annealing_row_formula(partition, temperatures, False)
                         cut_rank = partition.cut_rank
 
